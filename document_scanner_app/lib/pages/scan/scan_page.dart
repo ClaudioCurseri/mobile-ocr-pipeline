@@ -1,5 +1,6 @@
 import 'package:camera/camera.dart';
 import 'package:document_scanner_app/pages/settings/settings_page.dart';
+import 'package:document_scanner_app/service/pipeline/text_recognition_pipeline.dart';
 import 'package:flutter/material.dart';
 
 class ScanPage extends StatefulWidget {
@@ -104,8 +105,7 @@ class _ScanPageState extends State<ScanPage> {
                      icon: Icons.check, 
                      color: Colors.green, 
                      onPressed: () {
-                      // TODO: Start OCR
-                      print("success");
+                      TextRecognitionPipeline().scanDocument(_capturedImage!);
                      }
                    ),
                 ] else ...[
