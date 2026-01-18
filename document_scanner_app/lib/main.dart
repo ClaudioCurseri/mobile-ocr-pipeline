@@ -1,13 +1,21 @@
+import 'package:camera/camera.dart';
 import 'package:document_scanner_app/pages/home/home_page.dart';
 import 'package:flutter/material.dart';
 import 'package:document_scanner_app/theme.dart';
 
-void main() {
-  runApp(const MainApp());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final cameras = await availableCameras();
+  final firstCamera = cameras.first;
+
+  runApp(MainApp(camera: firstCamera));
 }
 
 class MainApp extends StatelessWidget {
-  const MainApp({super.key});
+
+  final CameraDescription camera;
+
+  const MainApp({super.key, required this.camera});
 
   @override
   Widget build(BuildContext context) {
@@ -24,7 +32,7 @@ class MainApp extends StatelessWidget {
 
       themeMode: ThemeMode.system,
 
-      home: const HomePage(),
+      home: HomePage(camera: camera),
     );
   }
 }

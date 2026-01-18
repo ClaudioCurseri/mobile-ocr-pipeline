@@ -1,8 +1,13 @@
+import 'package:camera/camera.dart';
+import 'package:document_scanner_app/pages/scan/scan_page.dart';
 import 'package:document_scanner_app/pages/settings/settings_page.dart';
 import 'package:flutter/material.dart';
 
 class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+
+final CameraDescription camera;
+
+  const HomePage({super.key, required this.camera});
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -31,7 +36,16 @@ class _HomePageState extends State<HomePage> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {},
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (BuildContext context) {
+                return ScanPage(camera: widget.camera,);
+              }
+            )
+          );
+        },
         child: const Icon(Icons.camera_enhance_rounded),
         ),
         floatingActionButtonLocation: FloatingActionButtonLocation.endContained,
