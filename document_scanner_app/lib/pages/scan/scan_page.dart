@@ -23,7 +23,7 @@ class _ScanPageState extends State<ScanPage> {
     super.initState();
     _controller = CameraController(
       widget.camera,
-      ResolutionPreset.medium,
+      ResolutionPreset.max,
     );
     _initializeControllerFuture = _controller.initialize();
   }

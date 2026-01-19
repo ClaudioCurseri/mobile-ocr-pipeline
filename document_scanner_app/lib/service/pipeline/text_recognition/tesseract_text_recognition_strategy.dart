@@ -7,7 +7,7 @@ class TesseractTextRecognitionStrategy implements TextRecognitionStrategy {
 
   @override
   Future<List<OcrItem>> recognizeText(XFile file) async {
-    String text = await FlutterTesseractOcr.extractHocr(file.path);
+    String text = await FlutterTesseractOcr.extractHocr(file.path, language: "deu");
     return OcrItem.fromHocr(text);
   }
 }
