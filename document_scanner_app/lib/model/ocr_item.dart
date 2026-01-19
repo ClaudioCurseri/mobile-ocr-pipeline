@@ -1,4 +1,5 @@
 import 'dart:ui';
+import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:html/parser.dart' as html_parser;
 
 // class that represents a single OCR'd text instance
@@ -39,7 +40,23 @@ class OcrItem {
         ));
       }
     }
+    return items;
+  }
 
+  // creates a list of OcrItems that stem from a RecognizedText object from the Google ML Kit text recognition.
+  static List<OcrItem> fromRecognizedText(RecognizedText recognizedText) {
+    final List<OcrItem> items = [];
+    for (TextBlock block in recognizedText.blocks) {
+      for (TextLine line in block.lines) {
+        for (TextElement element in line.elements) {
+          items.add(OcrItem(
+            text: element.text,
+            boundingBox: element.boundingBox,
+            confidence: element.confidence?.toInt() ?? 0
+          ));
+        }
+      }
+    }
     return items;
   }
 }

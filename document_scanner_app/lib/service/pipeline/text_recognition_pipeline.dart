@@ -1,6 +1,7 @@
 
 
 import 'package:camera/camera.dart';
+import 'package:document_scanner_app/service/pipeline/text_recognition/mlkit_text_recognition_strategy.dart';
 import 'package:document_scanner_app/service/pipeline/text_recognition/tesseract_text_recognition_strategy.dart';
 import 'package:document_scanner_app/service/pipeline/text_recognition/text_recognition_strategy.dart';
 import 'package:document_scanner_app/util/ocr_to_pdf.dart';
