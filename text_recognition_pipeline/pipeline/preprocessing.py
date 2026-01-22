@@ -10,7 +10,7 @@ class Preprocessing:
 
     def preprocessingStep(self, image: MatLike) -> MatLike:
         # TODO Implement preprocessing steps
-        image = self._correctPageOrientation(image)
+        #image = self._correctPageOrientation(image)
         return image
     
 
