@@ -11,7 +11,7 @@ class TextRecognitionPipeline:
         self._preprocessing = Preprocessing()
         self._text_recognition = TextRecognition()
 
-    def run(self, document: str, output_as_gt: bool=True) -> str | dict:
+    def run(self, document: str, output_as_gt: bool=True) -> tuple[str | dict, MatLike]:
         """
         Run the OCR pipeline for one document.
         
@@ -21,12 +21,16 @@ class TextRecognitionPipeline:
         :type output_as_gt: bool    
         """
         image: MatLike = cv2.imread(document)
+        image: MatLike = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         
         preprocessed_image: MatLike = self._preprocessing.preprocessingStep(image)
 
         recognition_result = self._text_recognition.recognizeText(preprocessed_image)
 
-        return self._convert_to_gt_format(recognition_result) if output_as_gt else recognition_result
+        if output_as_gt:
+            return self._convert_to_gt_format(recognition_result), preprocessed_image
+        else:
+            return recognition_result, preprocessed_image
     
     def _convert_to_gt_format(self, recognition_output: dict) -> str:
         """

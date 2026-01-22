@@ -12,9 +12,7 @@ class TextRecognitionPipelineEvaluation:
         """
         Visualize the result of the recongition result by displaying the generated bounding boxes and the document picture.
         """
-        result: dict = self._pipeline.run(document=document, output_as_gt=False)
-        image = cv2.imread(document)
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        result, image = self._pipeline.run(document=document, output_as_gt=False)
         n_boxes = len(result["text"])
 
         for position in range(n_boxes):
