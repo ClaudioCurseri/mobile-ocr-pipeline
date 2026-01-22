@@ -6,8 +6,16 @@
 
 class Preprocessing {
 public:
-    cv::Mat preprocessingStep(const cv::Mat& image);
-    void showImage(const cv::Mat& image);
+    Preprocessing();
+    ~Preprocessing();
+    void setImage(const cv::Mat &image);
+
+    cv::Mat preprocessingStep();
+    void showImage();
+private:
+    tesseract::TessBaseAPI *api;
+    cv::Mat image;
+    void correctPageOrientation();
 };
 
 

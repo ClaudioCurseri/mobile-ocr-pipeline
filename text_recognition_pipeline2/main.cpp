@@ -21,10 +21,11 @@ int main(int argc, char* argv[]) {
     }
     // initialize tesseract
     auto *api = new tesseract::TessBaseAPI();
-    if (api->Init(nullptr, "eng+deu+lat")) {
+    if (api->Init(nullptr, "eng")) {
         std::cerr << "Could not initialize tesseract." << std::endl;
         return 1;
     }
+    api->SetPageSegMode(tesseract::PSM_AUTO);
     // initialize text recognition pipeline
     auto *preprocessing = new Preprocessing();
     auto *textRecognition = new TextRecognition(api);
@@ -56,41 +57,45 @@ int main(int argc, char* argv[]) {
             return 1;
         }
         // run the pipeline
-        auto image = cv::imread(inputPath.string(), cv::IMREAD_COLOR_RGB);
-        image = preprocessing->preprocessingStep(image);
-        preprocessing->showImage(image);
+        auto image = cv::imread(inputPath.string(), cv::IMREAD_COLOR);
+        preprocessing->setImage(image);
+        preprocessing->preprocessingStep();
+        preprocessing->showImage();
     } else {
-        // calculate amount of files to test
-        using std::filesystem::directory_iterator;
-        auto imagesToProcess = std::distance(directory_iterator(inputDir), directory_iterator{});
-        for (imageNum = 1; imageNum <= imagesToProcess; imageNum++) {
-            // construct input filepath
-            std::ostringstream filenameStream;
-            filenameStream << std::setw(5) << std::setfill('0') << imageNum << ".jpg";
-            std::string filename = filenameStream.str();
-            std::filesystem::path inputPath = inputDir / filename;
+        imageNum = 1;
+        for (const auto& entry : std::filesystem::directory_iterator(inputDir)) {
+            if (entry.path().extension() == ".jpg") {
+                // construct input filepath
+                std::ostringstream filenameStream;
+                filenameStream << std::setw(5) << std::setfill('0') << imageNum << ".jpg";
+                std::string filename = filenameStream.str();
+                std::filesystem::path inputPath = inputDir / filename;
 
-            // construct output filepath
-            std::filesystem::path outputFilename = std::filesystem::path(filename).replace_extension(".txt");
-            std::filesystem::path outputPath = outputDir / outputFilename;
+                // construct output filepath
+                std::filesystem::path outputFilename = std::filesystem::path(filename).replace_extension(".txt");
+                std::filesystem::path outputPath = outputDir / outputFilename;
 
-            // ensure input file exists
-            if (!std::filesystem::exists(inputPath)) {
-                std::cerr << "File " << filename << " does not exist. Skipping." << std::endl;
-                continue;
-            }
-            // run the pipeline
-            auto image = cv::imread(inputPath.string(), cv::IMREAD_COLOR_RGB);
-            image = preprocessing->preprocessingStep(image);
-            auto recognitionResult = textRecognition->recognize(image);
+                // ensure input file exists
+                if (!std::filesystem::exists(inputPath)) {
+                    std::cerr << "File " << filename << " does not exist. Skipping." << std::endl;
+                    continue;
+                }
+                // run the pipeline
+                auto image = cv::imread(inputPath.string(), cv::IMREAD_COLOR);
+                preprocessing->setImage(image);
+                image = preprocessing->preprocessingStep();
+                api->SetImage(image.data, image.cols, image.rows, image.channels(), image.step);
+                auto recognitionResult = textRecognition->recognize(image);
 
-            // save results
-            if (std::ofstream outFile(outputPath); outFile.is_open()) {
-                outFile << recognitionResult;
-                outFile.close();
-                std::cout << "  > Saved result to: " << outputFilename << std::endl;
-            } else {
-                std::cerr << "Error: Could not write to " << outputPath << std::endl;
+                // save results
+                if (std::ofstream outFile(outputPath); outFile.is_open()) {
+                    outFile << recognitionResult;
+                    outFile.close();
+                    std::cout << "  > Saved result to: " << outputFilename << std::endl;
+                } else {
+                    std::cerr << "Error: Could not write to " << outputPath << std::endl;
+                }
+                imageNum += 1;
             }
         }
     }
