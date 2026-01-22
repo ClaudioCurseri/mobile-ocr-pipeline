@@ -5,16 +5,20 @@ from pipeline.text_recognition import TextRecognition
 
 class TextRecognitionPipeline:
 
+    
+
     def __init__(self):
         self._preprocessing = Preprocessing()
         self._text_recognition = TextRecognition()
 
-    def run(self, document: str):
+    def run(self, document: str, output_as_gt: bool=True) -> str | dict:
         """
         Run the OCR pipeline for one document.
         
         :param document: Path to the document file.
         :type document: str
+        :param output_as_gt: Whether the output should be in the gt format or as a dictionary.
+        :type output_as_gt: bool    
         """
         image: MatLike = cv2.imread(document)
         
@@ -22,9 +26,9 @@ class TextRecognitionPipeline:
 
         recognition_result = self._text_recognition.recognizeText(preprocessed_image)
 
-        return self._convert_to_gt_format(recognition_result)
+        return self._convert_to_gt_format(recognition_result) if output_as_gt else recognition_result
     
-    def _convert_to_gt_format(self, recognition_output: dict):
+    def _convert_to_gt_format(self, recognition_output: dict) -> str:
         """
         Converts the recognition result to the ground truth format.
         
