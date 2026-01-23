@@ -21,6 +21,7 @@ cv::Mat Preprocessing::preprocessingStep() {
     convertToBinary();
     medianFilter();
     correctPageOrientation();
+    resizeImage();
     this->image = this->internalImage.clone();
     return this->image;
 }
@@ -71,5 +72,12 @@ void Preprocessing::convertToBinary() {
 
 void Preprocessing::medianFilter() {
     cv::medianBlur(this->internalImage, this->internalImage, 5);
+}
+
+void Preprocessing::resizeImage() {
+    constexpr int targetWidth = 2480;
+    constexpr int targetHeight = 3508;
+    const auto targetSize = cv::Size(targetWidth, targetHeight);
+    cv::resize(this->internalImage, this->internalImage, targetSize);
 }
 

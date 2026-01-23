@@ -19,6 +19,7 @@ private:
     void convertToGrayscale();
     void convertToBinary();
     void medianFilter();
+    void resizeImage();
 };
 
 
