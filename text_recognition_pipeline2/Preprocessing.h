@@ -9,13 +9,16 @@ public:
     Preprocessing();
     ~Preprocessing();
     void setImage(const cv::Mat &image);
-
     cv::Mat preprocessingStep();
-    void showImage();
+    void showImage() const;
 private:
     tesseract::TessBaseAPI *api;
     cv::Mat image;
+    cv::Mat internalImage;
     void correctPageOrientation();
+    void convertToGrayscale();
+    void convertToBinary();
+    void medianFilter();
 };
 
 
