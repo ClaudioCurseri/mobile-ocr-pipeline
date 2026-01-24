@@ -11,8 +11,8 @@ public:
 private:
     cv::Mat image;
     cv::Mat internalImage;
+    void unsharpMasking();
     void convertToBinaryImage();
-    void applyMedianFilter();
     void resizeImage();
     void dewarpImage();
 };

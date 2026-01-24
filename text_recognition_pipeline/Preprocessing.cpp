@@ -2,8 +2,8 @@
 #include <opencv2/opencv.hpp>
 
 cv::Mat Preprocessing::preprocessingStep() {
+    unsharpMasking();
     convertToBinaryImage();
-    applyMedianFilter();
     dewarpImage();
     resizeImage();
     this->image = this->internalImage.clone();
@@ -24,10 +24,13 @@ void Preprocessing::showImage() const {
 void Preprocessing::convertToBinaryImage() {
     cv::cvtColor(this->internalImage, this->internalImage, cv::COLOR_RGB2GRAY);
     cv::adaptiveThreshold(this->internalImage, this->internalImage, 255, cv::ADAPTIVE_THRESH_MEAN_C, cv::THRESH_BINARY, 9, 5);
+    cv::medianBlur(this->internalImage, this->internalImage, 5);
 }
 
-void Preprocessing::applyMedianFilter() {
-    cv::medianBlur(this->internalImage, this->internalImage, 5);
+void Preprocessing::unsharpMasking() {
+    cv::Mat blurred;
+    cv::GaussianBlur(this->internalImage, blurred, cv::Size(0, 0), 1);
+    cv::addWeighted(this->internalImage, 1.5, blurred, -0.5, 0, this->internalImage);
 }
 
 void Preprocessing::resizeImage() {
@@ -59,12 +62,12 @@ std::vector<cv::Point2f> orderPoints(const std::vector<cv::Point>& pts) {
 void Preprocessing::dewarpImage() {
     // edge detection
     cv::Mat edged;
-    cv::Canny(this->internalImage, edged, 30, 100);
+    cv::Canny(this->internalImage, edged, 75, 200);
 
     // dilation -> all structures grow, increases chance of finding the document contours
     cv::Mat dilated;
     cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(11, 11));
-    cv::dilate(edged, dilated, kernel, cv::Point(-1, -1), 2);
+    cv::dilate(edged, dilated, kernel, cv::Point(-1, -1), 1);
 
     // find all contours
     std::vector<std::vector<cv::Point>> contours;
