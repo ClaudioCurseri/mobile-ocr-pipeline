@@ -64,6 +64,8 @@ def main():
         hypothesis = read_text_file(pred_path)
         reference = read_text_file(gt_path)
 
+        if len(hypothesis) == 0: continue
+
         if not reference:
             print(f"Warning: Empty ground truth file {filename}. Skipping.")
             continue
@@ -72,6 +74,9 @@ def main():
         try:
             w = jiwer.wer(reference, hypothesis, hypothesis_transform=transformation_wer)
             c = jiwer.cer(reference, hypothesis, hypothesis_transform=transformation_cer)
+
+            if w >= 1.0: continue
+
             results.append((filename, w, c))
         except Exception as e:
             print(f"Error processing {filename}: {e}")

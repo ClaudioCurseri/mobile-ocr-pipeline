@@ -8,7 +8,7 @@ class TextRecognition {
 public:
     explicit TextRecognition(tesseract::TessBaseAPI *api) : api(api) {}
 
-    std::string recognize(const cv::Mat& image) const;
+    tesseract::ResultIterator* recognize() const;
 
 private:
     tesseract::TessBaseAPI* api;

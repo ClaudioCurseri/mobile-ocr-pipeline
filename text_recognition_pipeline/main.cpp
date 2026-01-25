@@ -21,7 +21,7 @@ int main(int argc, char* argv[]) {
     }
     // initialize tesseract
     auto *api = new tesseract::TessBaseAPI();
-    if (api->Init(nullptr, "eng")) {
+    if (api->Init(nullptr, "eng", tesseract::OEM_LSTM_ONLY)) {
         std::cerr << "Could not initialize tesseract." << std::endl;
         return 1;
     }
@@ -29,7 +29,10 @@ int main(int argc, char* argv[]) {
     // initialize text recognition pipeline
     auto *preprocessing = new Preprocessing();
     auto *textRecognition = new TextRecognition(api);
-    // auto *postProcessing = new Postprocessing();
+    auto *postProcessing = new Postprocessing();
+    if (postProcessing->initDictionary("./dictionary/frequency_dictionary_en_82_765.txt")) {
+        std::cerr << "Could not initialize dictionary." << std::endl;
+    }
     // ----------run the text recognition pipeline----------
     const std::filesystem::path inputDir = "evaluation/testDataset/input_test/";
     const std::filesystem::path outputDir = "evaluation/testDataset/output_test/";
@@ -85,11 +88,19 @@ int main(int argc, char* argv[]) {
                 preprocessing->setImage(image);
                 image = preprocessing->preprocessingStep();
                 api->SetImage(image.data, image.cols, image.rows, image.channels(), image.step);
-                auto recognitionResult = textRecognition->recognize(image);
-
+                auto recognitionResult = textRecognition->recognize();
+                auto finalResult = postProcessing->postprocessingStep(recognitionResult);
                 // save results
                 if (std::ofstream outFile(outputPath); outFile.is_open()) {
-                    outFile << recognitionResult;
+                    for (const auto& s : finalResult) {
+                        outFile << std::get<4>(s);
+
+                        if (std::get<5>(s)) {
+                            outFile << "\n";
+                        } else {
+                            outFile << " ";
+                        }
+                    }
                     outFile.close();
                     std::cout << "  > Saved result to: " << outputFilename << std::endl;
                 } else {
@@ -105,7 +116,7 @@ int main(int argc, char* argv[]) {
     delete api;
     delete preprocessing;
     delete textRecognition;
-    // delete postProcessing;
+    delete postProcessing;
     std::cout << "Done." << std::endl;
     return 0;
 }

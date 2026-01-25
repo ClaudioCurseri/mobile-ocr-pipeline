@@ -2,7 +2,8 @@
 #include <iostream>
 #include <opencv2/opencv.hpp>
 
-std::string TextRecognition::recognize(const cv::Mat& image) const {
-    return api->GetUTF8Text();
+tesseract::ResultIterator* TextRecognition::recognize() const {
+    this->api->Recognize(nullptr);
+    return this->api->GetIterator();
 }
 
