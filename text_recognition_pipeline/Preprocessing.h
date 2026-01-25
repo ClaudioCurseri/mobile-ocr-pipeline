@@ -11,6 +11,7 @@ public:
 private:
     cv::Mat image;
     cv::Mat internalImage;
+    void convertToGrayscale();
     void unsharpMasking();
     void convertToBinaryImage();
     void resizeImage();

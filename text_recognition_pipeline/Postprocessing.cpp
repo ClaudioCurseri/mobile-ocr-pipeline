@@ -41,19 +41,6 @@ std::vector<std::tuple<int, int, int, int, std::string, bool>> Postprocessing::p
     return result;
 }
 
-std::string matchCase(const std::string &original, const std::string &replacement) {
-    if (original.empty() || replacement.empty()) return replacement;
-
-    std::string result = replacement;
-
-    // check for Title Case
-    if (std::isupper(original[0])) {
-        result[0] = std::toupper(result[0]);
-    }
-
-    return result;
-}
-
 bool isNotAlphanumeric(const std::string &word) {
     return std::ranges::none_of(word, isalnum);
 }
@@ -88,14 +75,15 @@ std::string Postprocessing::replaceWithTopResult(const std::string &word) const 
 // - the word is not a number
 // - the word does not contain punctuation symbols at the start or more importantly at the end
 // - the word is longer than a given value
+// - the word is capitalized
 std::string Postprocessing::replaceWithTopResultAdvanced(const std::string &word) const {
     if (isNotAlphanumeric(word) or isNumber(word)
-        or containsPunctuationAtStartOrEnd(word) or isEqOrShorterThan(word, 2)) return word;
+        or containsPunctuationAtStartOrEnd(word) or isEqOrShorterThan(word, 2)
+        or std::isupper(word[0])) return word;
     std::string replacement = word;
-    for (const auto suggestion = this->symspell->lookup(word, yams::symspell::Verbosity::Top, 2); const auto& s : suggestion) {
+    for (const auto suggestion = this->symspell->lookup(word, yams::symspell::Verbosity::Top, 1); const auto& s : suggestion) {
         if (s.distance == 0) return word;
         replacement = s.term;
-        replacement = matchCase(word, replacement);
         std::cout << "Replaced " << word << " with " << replacement << " | Distance: " << s.distance << std::endl;
     }
     return replacement;

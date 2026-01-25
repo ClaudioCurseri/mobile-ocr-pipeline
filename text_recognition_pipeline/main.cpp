@@ -30,7 +30,7 @@ int main(int argc, char* argv[]) {
     auto *preprocessing = new Preprocessing();
     auto *textRecognition = new TextRecognition(api);
     auto *postProcessing = new Postprocessing();
-    if (postProcessing->initDictionary("./dictionary/frequency_dictionary_en_82_765.txt")) {
+    if (postProcessing->initDictionary("./dictionary/frequency_dictionary_en_82_765_with_latin.txt")) {
         std::cerr << "Could not initialize dictionary." << std::endl;
     }
     // ----------run the text recognition pipeline----------

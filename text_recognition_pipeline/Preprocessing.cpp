@@ -2,6 +2,7 @@
 #include <opencv2/opencv.hpp>
 
 cv::Mat Preprocessing::preprocessingStep() {
+    convertToGrayscale();
     unsharpMasking();
     convertToBinaryImage();
     dewarpImage();
@@ -21,8 +22,15 @@ void Preprocessing::showImage() const {
     cv::waitKey(0);
 }
 
-void Preprocessing::convertToBinaryImage() {
+void Preprocessing::convertToGrayscale() {
     cv::cvtColor(this->internalImage, this->internalImage, cv::COLOR_RGB2GRAY);
+}
+
+
+void Preprocessing::convertToBinaryImage() {
+    if (this->internalImage.channels() > 1) {
+        cv::cvtColor(this->internalImage, this->internalImage, cv::COLOR_RGB2GRAY);
+    }
     cv::adaptiveThreshold(this->internalImage, this->internalImage, 255, cv::ADAPTIVE_THRESH_MEAN_C, cv::THRESH_BINARY, 9, 5);
     cv::medianBlur(this->internalImage, this->internalImage, 5);
 }
