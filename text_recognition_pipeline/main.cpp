@@ -30,8 +30,14 @@ int main(int argc, char* argv[]) {
     auto *preprocessing = new Preprocessing();
     auto *textRecognition = new TextRecognition(api);
     auto *postProcessing = new Postprocessing();
-    if (postProcessing->initDictionary("./dictionary/frequency_dictionary_en_82_765_with_latin.txt")) {
-        std::cerr << "Could not initialize dictionary." << std::endl;
+    if (postProcessing->initUnigramDictionary("./dictionary/frequency_dictionary_en_82_765.txt")) {
+        std::cerr << "Could not initialize unigram dictionary." << std::endl;
+    }
+    if (postProcessing->initUnigramDictionary("./dictionary/most-common-latin-words.txt")) {
+        std::cerr << "Could not initialize unigram dictionary." << std::endl;
+    }
+    if (postProcessing->initBigramDictionary("./dictionary/frequency_bigramdictionary_en_243_342.txt")) {
+        std::cerr << "Could not initialize bigram dictionary." << std::endl;
     }
     // ----------run the text recognition pipeline----------
     const std::filesystem::path inputDir = "evaluation/testDataset/input_test/";
