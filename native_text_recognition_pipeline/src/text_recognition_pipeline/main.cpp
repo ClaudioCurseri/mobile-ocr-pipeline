@@ -1,47 +1,25 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
-#include <tesseract/baseapi.h>
-#include "Postprocessing.h"
-#include "Preprocessing.h"
-#include "TextRecognition.h"
+#include "TextRecognitionPipeline.h"
 
-int main(int argc, char* argv[]) {
-    // check for test argument
-    auto testOneImage = false;
+int main() {
     long imageNum;
-    if (argc > 1) {
-        try {
-            testOneImage = true;
-            imageNum = strtol(argv[1], nullptr, 0);
-            std::cout << "Initializing (TEST MODE - will only process one image)..." << std::endl;
-        } catch (...) {
-            std::cout << "Initializing..." << std::endl;
-        }
-    }
-    // initialize tesseract
-    auto *api = new tesseract::TessBaseAPI();
-    if (api->Init(nullptr, "eng", tesseract::OEM_LSTM_ONLY)) {
-        std::cerr << "Could not initialize tesseract." << std::endl;
-        return 1;
-    }
-    api->SetPageSegMode(tesseract::PSM_AUTO);
     // initialize text recognition pipeline
-    auto *preprocessing = new Preprocessing();
-    auto *textRecognition = new TextRecognition(api);
-    auto *postProcessing = new Postprocessing();
-    if (postProcessing->initUnigramDictionary("./dictionary/frequency_dictionary_en_82_765.txt")) {
+    auto *textRecognition = new TextRecognitionPipeline();
+    // initialize dictionaries
+    if (textRecognition->initUnigramDictionary("./dictionary/frequency_dictionary_en_82_765.txt")) {
         std::cerr << "Could not initialize unigram dictionary." << std::endl;
     }
-    if (postProcessing->initUnigramDictionary("./dictionary/most-common-latin-words.txt")) {
+    if (textRecognition->initUnigramDictionary("./dictionary/most-common-latin-words.txt")) {
         std::cerr << "Could not initialize unigram dictionary." << std::endl;
     }
-    if (postProcessing->initBigramDictionary("./dictionary/frequency_bigramdictionary_en_243_342.txt")) {
+    if (textRecognition->initBigramDictionary("./dictionary/frequency_bigramdictionary_en_243_342.txt")) {
         std::cerr << "Could not initialize bigram dictionary." << std::endl;
     }
     // ----------run the text recognition pipeline----------
-    const std::filesystem::path inputDir = "evaluation/testDataset/input_test/";
-    const std::filesystem::path outputDir = "evaluation/testDataset/output_test/";
+    const std::filesystem::path inputDir = "./../../../evaluation/testDataset/input_test/";
+    const std::filesystem::path outputDir = "./../../../evaluation/testDataset/output_test/";
     // ensure input directory exists
     if (!std::filesystem::exists(inputDir)) {
         std::cerr << "Error: Input directory not found at " << std::filesystem::absolute(inputDir) << std::endl;
@@ -51,27 +29,9 @@ int main(int argc, char* argv[]) {
     if (!std::filesystem::exists(outputDir)) {
         std::filesystem::create_directories(outputDir);
     }
-
     // check whether it should only test one image or run for the whole dataset
     std::cout << "Running the pipeline..." << std::endl;
-    if (testOneImage) {
-        // construct input filepath
-        std::ostringstream filenameStream;
-        filenameStream << std::setw(5) << std::setfill('0') << imageNum << ".jpg";
-        std::string filename = filenameStream.str();
-        std::filesystem::path inputPath = inputDir / filename;
-        // ensure input file exists
-        if (!std::filesystem::exists(inputPath)) {
-            std::cerr << "Error: File " << filename << " does not exist." << std::endl;
-            return 1;
-        }
-        // run the pipeline
-        auto image = cv::imread(inputPath.string(), cv::IMREAD_COLOR);
-        preprocessing->setImage(image);
-        preprocessing->preprocessingStep();
-        preprocessing->showImage();
-    } else {
-        imageNum = 1;
+    imageNum = 1;
         for (const auto& entry : std::filesystem::directory_iterator(inputDir)) {
             if (entry.path().extension() == ".jpg") {
                 // construct input filepath
@@ -89,13 +49,25 @@ int main(int argc, char* argv[]) {
                     std::cerr << "File " << filename << " does not exist. Skipping." << std::endl;
                     continue;
                 }
+                // pipeline configuration
+                auto preprocessingConfig = TextRecognitionPipeline::PreprocessingConfig{
+                    true,
+                    true,
+                    true,
+                    true,
+                    true
+                };
+                auto postprocessingConfig = TextRecognitionPipeline::PostprocessingConfig{
+                    true,
+                    false
+                };
                 // run the pipeline
-                auto image = cv::imread(inputPath.string(), cv::IMREAD_COLOR);
-                preprocessing->setImage(image);
-                image = preprocessing->preprocessingStep();
-                api->SetImage(image.data, image.cols, image.rows, image.channels(), image.step);
-                auto recognitionResult = textRecognition->recognize();
-                auto finalResult = postProcessing->postprocessingStep(recognitionResult);
+                textRecognition->initTesseract();
+                textRecognition->setImage(inputPath.string().c_str());
+                textRecognition->preprocessingStep(preprocessingConfig);
+                textRecognition->textRecognitionStep();
+                textRecognition->postprocessingStep(postprocessingConfig);
+                auto finalResult = textRecognition->getRecognitionResult();
                 // save results
                 if (std::ofstream outFile(outputPath); outFile.is_open()) {
                     for (const auto& s : finalResult) {
@@ -115,14 +87,10 @@ int main(int argc, char* argv[]) {
                 imageNum += 1;
             }
         }
-    }
+
     // ----------end of the text recognition pipeline----------
     // free memory
-    api->End();
-    delete api;
-    delete preprocessing;
     delete textRecognition;
-    delete postProcessing;
     std::cout << "Done." << std::endl;
     return 0;
 }
