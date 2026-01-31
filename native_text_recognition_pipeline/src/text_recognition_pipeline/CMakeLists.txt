@@ -11,7 +11,7 @@ pkg_check_modules(Tesseract REQUIRED tesseract IMPORTED_TARGET)
 
 add_executable(text_recognition_pipeline
         main.cpp
-        TextRecognitionPipeline.h
-        TextRecognitionPipeline.cpp)
+        text_recognition_pipeline.h
+        text_recognition_pipeline.cpp)
 
 target_link_libraries(${PROJECT_NAME} ${OpenCV_LIBS} PkgConfig::Tesseract yams-symspell)

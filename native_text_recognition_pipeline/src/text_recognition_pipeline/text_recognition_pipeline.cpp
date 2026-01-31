@@ -1,4 +1,4 @@
-#include "TextRecognitionPipeline.h"
+#include "text_recognition_pipeline.h"
 
 TextRecognitionPipeline::~TextRecognitionPipeline() {
     this->api->End();
@@ -322,4 +322,82 @@ std::string TextRecognitionPipeline::replaceWithContext(const std::string &previ
     }
 
     return candidates.empty() ? currentWord : candidates.front().term;
+}
+
+// --------------------- C adapter methods ---------------------
+
+TextRecognitionPipeline* TextRecognition_create() {
+    return new TextRecognitionPipeline();
+}
+
+void TextRecognition_destroy(const TextRecognitionPipeline* pipeline) {
+        delete pipeline;
+}
+
+void TextRecognition_setImage(TextRecognitionPipeline* pipeline, const char* imagePath) {
+    if (pipeline != nullptr) pipeline->setImage(imagePath);
+}
+
+void TextRecognition_preprocessingStep(TextRecognitionPipeline* pipeline, const C_PreprocessingConfig config) {
+    if (pipeline != nullptr) {
+        TextRecognitionPipeline::PreprocessingConfig cppConfig;
+        cppConfig.grayscale = config.grayscale;
+        cppConfig.unsharpMasking = config.unsharpMasking;
+        cppConfig.binary = config.binary;
+        cppConfig.dewarp = config.dewarp;
+        cppConfig.resize = config.resize;
+
+        pipeline->preprocessingStep(cppConfig);
+    }
+}
+
+void TextRecognition_initTesseract(TextRecognitionPipeline* pipeline) {
+    if (pipeline != nullptr) pipeline->initTesseract();
+}
+
+void TextRecognition_textRecognitionStep(TextRecognitionPipeline* pipeline) {
+    if (pipeline != nullptr) pipeline->textRecognitionStep();
+}
+
+int TextRecognition_initUnigramDictionary(TextRecognitionPipeline* pipeline, const char *filepath) {
+    if (pipeline != nullptr) return pipeline->initUnigramDictionary(filepath);
+    return -1;
+}
+
+int TextRecognition_initBigramDictionary(TextRecognitionPipeline* pipeline, const char *filepath) {
+    if (pipeline != nullptr) return pipeline->initBigramDictionary(filepath);
+    return -1;
+}
+
+void TextRecognition_postprocessingStep(TextRecognitionPipeline* pipeline, const C_PostprocessingConfig config) {
+    if (pipeline != nullptr) {
+        TextRecognitionPipeline::PostprocessingConfig cppConfig;
+        cppConfig.useTopResultFromDictionary = config.useTopResultFromDictionary;
+        cppConfig.useContext = config.useContext;
+
+        pipeline->postprocessingStep(cppConfig);
+    }
+}
+
+int TextRecognition_getResultCount(TextRecognitionPipeline* pipeline) {
+    if (pipeline == nullptr) return 0;
+    return static_cast<int>(pipeline->getRecognitionResult().size());
+}
+
+C_RecognitionResultItem TextRecognition_getResultItem(TextRecognitionPipeline* pipeline, const int index) {
+    C_RecognitionResultItem item = {0, 0, 0, 0, nullptr, false};
+
+    if (pipeline != nullptr) {
+        auto results = pipeline->getRecognitionResult();
+        if (index >= 0 && index < results.size()) {
+            const auto& tuple = results[index];
+            item.x1 = std::get<0>(tuple);
+            item.y1 = std::get<1>(tuple);
+            item.x2 = std::get<2>(tuple);
+            item.y2 = std::get<3>(tuple);
+            item.word = std::get<4>(tuple).c_str();
+            item.is_eol = std::get<5>(tuple);
+        }
+    }
+    return item;
 }

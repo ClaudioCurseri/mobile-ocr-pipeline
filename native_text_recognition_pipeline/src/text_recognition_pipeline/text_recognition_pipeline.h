@@ -1,5 +1,8 @@
 #ifndef TEXTRECOGNITIONPIPELINE_H
 #define TEXTRECOGNITIONPIPELINE_H
+
+#ifdef __cplusplus
+
 #include <iostream>
 #include <fstream>
 #include <opencv2/core/mat.hpp>
@@ -55,5 +58,58 @@ private:
     std::string replaceWithTopResult(const std::string &word) const;
     std::string replaceWithContext(const std::string &previousWord, const std::string &currentWord) const;
 };
+
+#else
+
+#include <stdbool.h>
+
+typedef struct TextRecognitionPipeline TextRecognitionPipeline;
+
+#endif
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+    typedef struct {
+        bool grayscale;
+        bool unsharpMasking;
+        bool binary;
+        bool dewarp;
+        bool resize;
+    } C_PreprocessingConfig;
+
+    typedef struct {
+        bool useTopResultFromDictionary;
+        bool useContext;
+    } C_PostprocessingConfig;
+
+    typedef struct {
+        int x1;
+        int y1;
+        int x2;
+        int y2;
+        const char* word;
+        bool is_eol;
+    } C_RecognitionResultItem;
+
+    TextRecognitionPipeline* TextRecognition_create();
+    void TextRecognition_destroy(const TextRecognitionPipeline* pipeline);
+
+    void TextRecognition_setImage(TextRecognitionPipeline* pipeline, const char* imagePath);
+    void TextRecognition_preprocessingStep(TextRecognitionPipeline* pipeline, C_PreprocessingConfig config);
+
+    void TextRecognition_initTesseract(TextRecognitionPipeline* pipeline);
+    void TextRecognition_textRecognitionStep(TextRecognitionPipeline* pipeline);
+
+    int TextRecognition_initUnigramDictionary(TextRecognitionPipeline* pipeline, const char *filepath);
+    int TextRecognition_initBigramDictionary(TextRecognitionPipeline* pipeline, const char *filepath);
+    void TextRecognition_postprocessingStep(TextRecognitionPipeline* pipeline, C_PostprocessingConfig config);
+    int TextRecognition_getResultCount(TextRecognitionPipeline* pipeline);
+    C_RecognitionResultItem TextRecognition_getResultItem(TextRecognitionPipeline* pipeline, int index);
+
+#ifdef __cplusplus
+}
+#endif
+
 
 #endif //TEXTRECOGNITIONPIPELINE_H

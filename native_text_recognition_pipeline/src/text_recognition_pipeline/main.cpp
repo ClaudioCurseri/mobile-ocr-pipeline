@@ -1,7 +1,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
-#include "TextRecognitionPipeline.h"
+#include "text_recognition_pipeline.h"
 
 /**
  * The main entry point of the text recognition pipeline.

@@ -1,0 +1,13 @@
+# Run with `dart run ffigen --config ffigen.yaml`.
+name: NativeTextRecognitionPipelineBindings
+description: The native text recognition pipeline
+output: lib/generated_bindings.dart
+headers:
+  entry-points:
+    - 'src/text_recognition_pipeline/text_recognition_pipeline.h'
+  include-directives:
+    - 'src/text_recognition_pipeline/text_recognition_pipeline.h'
+ffi-native:
+comments:
+  style: any
+  length: full
