@@ -15,6 +15,7 @@ dependencies:
   flutter_tesseract_ocr: ^0.4.30
   html: ^0.15.6
   pdf: ^3.11.3
+  flutter_pdfview: ^1.3.2
   permission_handler: ^12.0.1
   google_mlkit_text_recognition: ^0.15.0
   text_recognition_pipeline:

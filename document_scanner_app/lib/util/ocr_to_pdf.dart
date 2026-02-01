@@ -4,11 +4,10 @@ import 'package:document_scanner_app/model/ocr_item.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:path_provider/path_provider.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'dart:ui' as ui;
 
 // FIXME: fix the method
-void createSearchablePdf(XFile imageFile, List<OcrItem> items) async {
+Future<bool> createSearchablePdf(XFile imageFile, List<OcrItem> items) async {
   final pdf = pw.Document();
 
   final imageBytes = await imageFile.readAsBytes();
@@ -32,7 +31,7 @@ void createSearchablePdf(XFile imageFile, List<OcrItem> items) async {
             ),
             ...items.map((item) {
               final bottomPosition = imageHeight - item.boundingBox.bottom;
-              
+
               return pw.Positioned(
                 left: item.boundingBox.left,
                 bottom: bottomPosition,
@@ -57,56 +56,29 @@ void createSearchablePdf(XFile imageFile, List<OcrItem> items) async {
       },
     ),
   );
-  writeFile(pdf);
+  return writeFile(pdf);
 }
 
-void writeFile(pw.Document pdf) async {
-      PermissionStatus permissionStatus = await getStoragePermission();
-      if (permissionStatus == PermissionStatus.granted) {
-        try {
-          String? externalStoragePath = await _getDownloadPath();
-          if (externalStoragePath != null) {
-            externalStoragePath += "/scanned_doc_${DateTime.now().millisecondsSinceEpoch}.pdf";
-            File file = File(externalStoragePath);
-            await file.writeAsBytes(await pdf.save());
-            print("File written at $externalStoragePath");
-          }
-        } catch (e) {
-          print('Error in writing file=$e');
-        }
-      }
+Future<String> get _localPath async {
+  final directory = await getApplicationDocumentsDirectory();
+  return directory.path;
+}
+
+Future<File> setLocalFileReference(String fileName) async {
+  final path = await _localPath;
+  return File('$path/$fileName');
+}
+
+Future<bool> writeFile(pw.Document pdf) async {
+  try {
+    var file = await setLocalFileReference(
+      "scanned_doc_${DateTime.now().millisecondsSinceEpoch}.pdf",
+    );
+    file.writeAsBytes(await pdf.save());
+    print("File written at $file");
+  } catch (e) {
+    print('Error in writing file=$e');
+    return false;
   }
-
-Future<PermissionStatus> getStoragePermission() async {
-    var permissionStatus = Platform.isIOS
-        ? await Permission.storage.request()
-        : await Permission.manageExternalStorage.request();
-    if (permissionStatus.isDenied || permissionStatus.isRestricted) {
-
-      permissionStatus = await Permission.storage.request();
-
-      if (permissionStatus.isDenied) {
-        await openAppSettings();
-      }
-    } else if (permissionStatus.isPermanentlyDenied) {
-      await openAppSettings();
-    }
-    return permissionStatus;
-  }
-
-  Future<String?> _getDownloadPath() async {
-    Directory? directory;
-    try {
-      if (Platform.isIOS) {
-        directory = await getApplicationDocumentsDirectory();
-      } else {
-        directory = Directory('/storage/emulated/0/Download');
-        if (!await directory.exists()) {
-          directory = await getExternalStorageDirectory();
-        }
-      }
-    } catch (e) {
-      print("Cannot get download folder path with error=$e");
-    }
-    return directory?.path;
+  return true;
 }

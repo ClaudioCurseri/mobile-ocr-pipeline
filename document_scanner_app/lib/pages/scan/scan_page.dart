@@ -249,8 +249,19 @@ class _ScanPageState extends State<ScanPage> {
         ),
         _buildReviewBtn(
           icon: const Icon(Icons.check),
-          onPressed: () {
-            TextRecognitionPipeline().scanDocument(_capturedImage!);
+          onPressed: () async {
+            showDialog(
+              context: context, 
+              barrierDismissible: false, 
+              builder: (c) => const Center(child: CircularProgressIndicator())
+            );
+
+            var success = await TextRecognitionPipeline().scanDocument(_capturedImage!);
+
+            if (context.mounted) Navigator.pop(context);
+            if (mounted) {
+              Navigator.of(context).pop(success);
+            }
           },
           text: 'Scan',
         ),
