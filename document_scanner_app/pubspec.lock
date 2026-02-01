@@ -557,6 +557,13 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.7.7"
+  text_recognition_pipeline:
+    dependency: "direct main"
+    description:
+      path: "../native_text_recognition_pipeline"
+      relative: true
+    source: path
+    version: "0.0.1"
   typed_data:
     dependency: transitive
     description:

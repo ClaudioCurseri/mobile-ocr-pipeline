@@ -17,6 +17,8 @@ dependencies:
   pdf: ^3.11.3
   permission_handler: ^12.0.1
   google_mlkit_text_recognition: ^0.15.0
+  text_recognition_pipeline:
+    path: ../native_text_recognition_pipeline/
 
 dev_dependencies:
   flutter_test:

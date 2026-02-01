@@ -2,9 +2,13 @@ import 'package:camera/camera.dart';
 import 'package:document_scanner_app/pages/home/home_page.dart';
 import 'package:flutter/material.dart';
 import 'package:document_scanner_app/theme.dart';
+import 'package:flutter/services.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp
+  ]);
   final cameras = await availableCameras();
   final firstCamera = cameras.first;
 
