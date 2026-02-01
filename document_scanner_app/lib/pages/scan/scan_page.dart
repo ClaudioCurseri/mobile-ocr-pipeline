@@ -10,6 +10,13 @@ class FlashModeMenuOption {
   const FlashModeMenuOption({required this.flashMode, required this.icon});
 }
 
+class ExposureMenuOption {
+  final String label;
+  final double? value;
+
+  const ExposureMenuOption({required this.label, required this.value});
+}
+
 extension StringExtensions on String {
   String capitalize() {
     return "${this[0].toUpperCase()}${substring(1)}";
@@ -36,13 +43,47 @@ class _ScanPageState extends State<ScanPage> {
     FlashModeMenuOption(flashMode: FlashMode.torch, icon: Icons.flashlight_on),
   ];
   late FlashModeMenuOption _selectedFlashMode;
+  double _minAvailableExposureOffset = 0.0;
+  double _maxAvailableExposureOffset = 0.0;
+  late ExposureMenuOption _selectedExposureOption;
+  List<ExposureMenuOption> _exposureOptions = [];
 
   @override
   void initState() {
     super.initState();
     _controller = CameraController(widget.camera, ResolutionPreset.max);
-    _initializeControllerFuture = _controller.initialize();
+    _initializeControllerFuture = _controller.initialize().then((_) async {
+      _minAvailableExposureOffset = await _controller.getMinExposureOffset();
+      _maxAvailableExposureOffset = await _controller.getMaxExposureOffset();
+      _generateExposureOptions();
+    });
     _selectedFlashMode = _flashModeOptions.first;
+    _selectedExposureOption = const ExposureMenuOption(label: 'Auto', value: null); 
+  }
+
+  void _generateExposureOptions() {
+    List<ExposureMenuOption> options = [];
+    options.add(const ExposureMenuOption(label: 'Auto', value: null));
+    for (double value = -1.0; value < 0.0; value += 0.25) {
+      options.add(ExposureMenuOption(label: value.toString(), value: _minAvailableExposureOffset * value));
+    }
+    for (double value = 0.0; value <= 1.0; value += 0.25) {
+      options.add(ExposureMenuOption(label: '+$value', value: _maxAvailableExposureOffset * value));
+    }
+    setState(() {_exposureOptions = options;});
+  }
+
+  Future<void> _setExposure(ExposureMenuOption option) async {
+    if (option.value == null) {
+      await _controller.setExposureMode(ExposureMode.auto);
+      await _controller.setExposureOffset(0.0);
+    } else {
+      await _controller.setExposureMode(ExposureMode.locked); 
+      await _controller.setExposureOffset(option.value!);
+    }
+    setState(() {
+      _selectedExposureOption = option;
+    });
   }
 
   @override
@@ -56,7 +97,47 @@ class _ScanPageState extends State<ScanPage> {
       key: const ValueKey('captureState'),
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
-        IconButton(onPressed: () {}, icon: Icon(Icons.exposure)),
+        MenuAnchor(
+          builder:
+              (BuildContext context, MenuController controller, Widget? child) {
+            return IconButton(
+              onPressed: () {
+                if (controller.isOpen) {
+                  controller.close();
+                } else {
+                  controller.open();
+                }
+              },
+              icon: Icon(
+                Icons.exposure,
+                color: _selectedExposureOption.value == null
+                    ? Theme.of(context).colorScheme.onSurfaceVariant
+                    : Theme.of(context).colorScheme.primary,
+              ),
+              tooltip: ' Select Exposure',
+            );
+          },
+          menuChildren: _exposureOptions.map((option) {
+            return MenuItemButton(
+              onPressed: () => _setExposure(option),
+              trailingIcon: _selectedExposureOption == option
+                  ? Icon(
+                      Icons.check,
+                      size: 18,
+                      color: Theme.of(context).colorScheme.primary,
+                    )
+                  : null,
+              child: Text(
+                option.label,
+                style: TextStyle(
+                  color: _selectedExposureOption == option
+                      ? Theme.of(context).colorScheme.primary
+                      : Theme.of(context).colorScheme.onSurface,
+                ),
+              ),
+            );
+          }).toList(),
+        ),
         OutlinedButton(
           onPressed: () async {
             try {
