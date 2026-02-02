@@ -1,4 +1,5 @@
 #include "text_recognition_pipeline.h"
+#include <syslog.h>
 
 TextRecognitionPipeline::~TextRecognitionPipeline() {
     this->api->End();
@@ -145,10 +146,12 @@ void TextRecognitionPipeline::dewarpImage() {
 }
 
 
-void TextRecognitionPipeline::initTesseract() {
+void TextRecognitionPipeline::initTesseract(const char* filepath) {
     this->api = new tesseract::TessBaseAPI();
-    if (api->Init(nullptr, "eng", tesseract::OEM_LSTM_ONLY)) {
+    if (api->Init(filepath, "eng", tesseract::OEM_LSTM_ONLY)) {
         std::cerr << "Could not initialize tesseract." << std::endl;
+        syslog(LOG_ALERT, "Could not initialize tesseract.");
+        syslog(LOG_ALERT, "%s", filepath);
         return;
     }
     api->SetPageSegMode(tesseract::PSM_AUTO);
@@ -156,8 +159,12 @@ void TextRecognitionPipeline::initTesseract() {
 
 
 void TextRecognitionPipeline::textRecognitionStep() {
-    this->api->Recognize(nullptr);
-    this->tesseractRecognitionResult = this->api->GetIterator();
+    try {
+        this->api->Recognize(nullptr);
+        this->tesseractRecognitionResult = this->api->GetIterator();
+    } catch (const std::exception& e) {
+        syslog(LOG_ALERT, "TextRecognitionPipeline::textRecognitionStep - %s", e.what());
+    }
 }
 
 
@@ -243,7 +250,7 @@ bool containsPunctuationAtStartOrEnd(const std::string &word) {
     or word.ends_with(",") or word.ends_with(";") or word.ends_with(":");
 }
 
-// replaces every word with the top result from the dictionary ONLY IF the following conditions are met:
+// replaces every word with the top result from the assets ONLY IF the following conditions are met:
 // - the word is alphanumeric
 // - the word is not a number
 // - the word does not contain punctuation symbols at the start or more importantly at the end
@@ -351,8 +358,49 @@ void TextRecognition_preprocessingStep(TextRecognitionPipeline* pipeline, const 
     }
 }
 
-void TextRecognition_initTesseract(TextRecognitionPipeline* pipeline) {
-    if (pipeline != nullptr) pipeline->initTesseract();
+C_ImageBuffer TextRecognition_getImage(TextRecognitionPipeline* pipeline) {
+    C_ImageBuffer buffer = {nullptr, 0};
+
+    if (pipeline == nullptr) {
+        return buffer;
+    }
+
+    const cv::Mat img = pipeline->getImage();
+
+    if (img.empty()) {
+        syslog(LOG_ALERT, "TextRecognition_getEncodedImage: Image is empty!");
+        return buffer;
+    }
+
+    std::vector<uint8_t> encoded;
+    const std::vector params = {cv::IMWRITE_JPEG_QUALITY, 80};
+
+    try {
+        cv::imencode(".jpg", img, encoded, params);
+    } catch (const std::exception& e) {
+        syslog(LOG_ALERT, "Encoding failed: %s", e.what());
+        return buffer;
+    }
+
+    if (encoded.empty()) return buffer;
+
+    buffer.length = static_cast<int>(encoded.size());
+    buffer.imageData = static_cast<uint8_t*>(malloc(buffer.length));
+
+    if (buffer.imageData != nullptr) {
+        std::memcpy(buffer.imageData, encoded.data(), buffer.length);
+    }
+    return buffer;
+}
+
+void TextRecognition_freeImage(const C_ImageBuffer imageBuffer) {
+    if (imageBuffer.imageData != nullptr) {
+        free(imageBuffer.imageData);
+    }
+}
+
+void TextRecognition_initTesseract(TextRecognitionPipeline* pipeline, const char* filepath) {
+    if (pipeline != nullptr) pipeline->initTesseract(filepath);
 }
 
 void TextRecognition_textRecognitionStep(TextRecognitionPipeline* pipeline) {

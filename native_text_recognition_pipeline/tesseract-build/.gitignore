@@ -1,0 +1,12 @@
+# environment variables
+.env
+
+# cloned repositories
+tesseract/
+leptonica/
+
+# generated files
+bin/
+lib/
+include/
+share/

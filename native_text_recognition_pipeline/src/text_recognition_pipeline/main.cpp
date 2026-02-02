@@ -13,13 +13,13 @@ int main() {
     // initialize text recognition pipeline
     auto *textRecognition = new TextRecognitionPipeline();
     // initialize dictionaries
-    if (textRecognition->initUnigramDictionary("./dictionary/frequency_dictionary_en_82_765.txt")) {
+    if (textRecognition->initUnigramDictionary("./assets/frequency_dictionary_en_82_765.txt")) {
         std::cerr << "Could not initialize unigram dictionary." << std::endl;
     }
-    if (textRecognition->initUnigramDictionary("./dictionary/most-common-latin-words.txt")) {
+    if (textRecognition->initUnigramDictionary("./assets/most-common-latin-words.txt")) {
         std::cerr << "Could not initialize unigram dictionary." << std::endl;
     }
-    if (textRecognition->initBigramDictionary("./dictionary/frequency_bigramdictionary_en_243_342.txt")) {
+    if (textRecognition->initBigramDictionary("./assets/frequency_bigramdictionary_en_243_342.txt")) {
         std::cerr << "Could not initialize bigram dictionary." << std::endl;
     }
     const std::filesystem::path inputDir = "./../../../evaluation/testDataset/input_test/";
@@ -65,7 +65,7 @@ int main() {
                 false
             };
             // run the pipeline
-            textRecognition->initTesseract();
+            textRecognition->initTesseract("./assets/tessdata/");
             textRecognition->setImage(inputPath.string().c_str());
             textRecognition->preprocessingStep(preprocessingConfig);
             textRecognition->textRecognitionStep();

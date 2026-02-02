@@ -30,7 +30,7 @@ public:
     void preprocessingStep(PreprocessingConfig config);
     cv::Mat getImage();
     // text recognition
-    void initTesseract();
+    void initTesseract(const char* filepath);
     void textRecognitionStep();
     // postprocessing
     int initUnigramDictionary(const char *filepath);
@@ -62,6 +62,7 @@ private:
 #else
 
 #include <stdbool.h>
+#include <stdint.h>
 
 typedef struct TextRecognitionPipeline TextRecognitionPipeline;
 
@@ -92,13 +93,20 @@ extern "C" {
         bool is_eol;
     } C_RecognitionResultItem;
 
+    typedef struct {
+        uint8_t* imageData;
+        int length;
+    } C_ImageBuffer;
+
     TextRecognitionPipeline* TextRecognition_create();
     void TextRecognition_destroy(const TextRecognitionPipeline* pipeline);
 
     void TextRecognition_setImage(TextRecognitionPipeline* pipeline, const char* imagePath);
     void TextRecognition_preprocessingStep(TextRecognitionPipeline* pipeline, C_PreprocessingConfig config);
+    C_ImageBuffer TextRecognition_getImage(TextRecognitionPipeline* pipeline);
+    void TextRecognition_freeImage(C_ImageBuffer imageBuffer);
 
-    void TextRecognition_initTesseract(TextRecognitionPipeline* pipeline);
+    void TextRecognition_initTesseract(TextRecognitionPipeline* pipeline, const char* filepath);
     void TextRecognition_textRecognitionStep(TextRecognitionPipeline* pipeline);
 
     int TextRecognition_initUnigramDictionary(TextRecognitionPipeline* pipeline, const char *filepath);

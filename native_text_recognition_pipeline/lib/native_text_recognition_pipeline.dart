@@ -1,6 +1,12 @@
+import 'dart:isolate';
+import 'dart:typed_data';
+
 import 'generated_bindings.dart';
 import 'dart:ffi';
+import 'dart:io';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:ffi/ffi.dart';
+import 'package:path_provider/path_provider.dart';
 
 class NativeTextRecognitionPipeline {
   late Pointer<TextRecognitionPipeline> textRecognitionPipeline;
@@ -30,6 +36,21 @@ class NativeTextRecognitionPipeline {
     }
   }
 
+  Uint8List? getImage() {
+    final buffer = TextRecognition_getImage(textRecognitionPipeline);
+
+    if (buffer.imageData == nullptr || buffer.length == 0) {
+      return null;
+    }
+
+    try {
+      final cList = buffer.imageData.asTypedList(buffer.length);
+      return Uint8List.fromList(cList);
+    } finally {
+      TextRecognition_freeImage(buffer);
+    }
+  }
+
   void setPreprocessingConfig(PreprocessingConfig config) {
     preprocessingConfig.ref.grayscale = config.grayscale;
     preprocessingConfig.ref.unsharpMasking = config.unsharpMasking;
@@ -43,8 +64,32 @@ class NativeTextRecognitionPipeline {
     postprocessingConfig.ref.useContext = config.useContext;
   }
 
-  void initTesseract() {
-    TextRecognition_initTesseract(textRecognitionPipeline);
+  Future<void> initTesseract() async {
+    final directory = await getApplicationDocumentsDirectory();
+
+    final tessDataFolder = Directory('${directory.path}/tessdata');
+    if (!await tessDataFolder.exists()) {
+      await tessDataFolder.create(recursive: true);
+    }
+
+    final filePath = '${tessDataFolder.path}/eng.traineddata';
+    final file = File(filePath);
+    
+    if (!await file.exists()) {
+      final byteData = await rootBundle.load('assets/tessdata/eng.traineddata');
+      await file.writeAsBytes(byteData.buffer.asUint8List(
+        byteData.offsetInBytes, 
+        byteData.lengthInBytes
+      ));
+    }
+
+    final cPath = tessDataFolder.path.toNativeUtf8();
+    
+    try {
+      TextRecognition_initTesseract(textRecognitionPipeline, cPath.cast()); 
+    } finally {
+      calloc.free(cPath);
+    }
   }
 
   void initUnigramDictionary(String path) {
@@ -67,16 +112,29 @@ class NativeTextRecognitionPipeline {
     }
   }
 
-  void preprocessingStep() {
-    TextRecognition_preprocessingStep(textRecognitionPipeline, preprocessingConfig.ref);
+  Future<void> preprocessingStep() async {
+    final ptr = textRecognitionPipeline;
+    final config = preprocessingConfig.ref;
+    await Isolate.run(() {
+      TextRecognition_preprocessingStep(ptr, config); 
+    });
   }
 
-  void textRecognitionStep() {
-    TextRecognition_textRecognitionStep(textRecognitionPipeline);
+  Future<void> textRecognitionStep() async {
+    final ptr = textRecognitionPipeline;
+    await Isolate.run(() {
+      print("Starting Tesseract on Background Isolate...");
+      TextRecognition_textRecognitionStep(ptr);
+      print("Tesseract Finished!");
+    });
   }
 
-  void postprocessingStep() {
-    TextRecognition_postprocessingStep(textRecognitionPipeline, postprocessingConfig.ref);
+  Future<void> postprocessingStep() async {
+    final ptr = textRecognitionPipeline;
+    final config = postprocessingConfig.ref;
+    await Isolate.run(() {
+      TextRecognition_postprocessingStep(ptr, config);
+    });
   }
 
   List<RecognitionResult> getRecognitionResult() {

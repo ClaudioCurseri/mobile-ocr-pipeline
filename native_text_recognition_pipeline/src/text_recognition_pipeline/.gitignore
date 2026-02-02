@@ -1,4 +1,5 @@
 third_party/yams-symspell/cmake-build-debug/
+third_party/android/
 
 # Prerequisites
 *.d

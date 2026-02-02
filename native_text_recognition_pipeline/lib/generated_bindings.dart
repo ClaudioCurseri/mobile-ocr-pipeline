@@ -28,9 +28,20 @@ external void TextRecognition_preprocessingStep(
   C_PreprocessingConfig config,
 );
 
-@ffi.Native<ffi.Void Function(ffi.Pointer<TextRecognitionPipeline>)>()
+@ffi.Native<C_ImageBuffer Function(ffi.Pointer<TextRecognitionPipeline>)>()
+external C_ImageBuffer TextRecognition_getImage(
+  ffi.Pointer<TextRecognitionPipeline> pipeline,
+);
+
+@ffi.Native<ffi.Void Function(C_ImageBuffer)>()
+external void TextRecognition_freeImage(C_ImageBuffer imageBuffer);
+
+@ffi.Native<
+  ffi.Void Function(ffi.Pointer<TextRecognitionPipeline>, ffi.Pointer<ffi.Char>)
+>()
 external void TextRecognition_initTesseract(
   ffi.Pointer<TextRecognitionPipeline> pipeline,
+  ffi.Pointer<ffi.Char> filepath,
 );
 
 @ffi.Native<ffi.Void Function(ffi.Pointer<TextRecognitionPipeline>)>()
@@ -125,4 +136,11 @@ final class C_RecognitionResultItem extends ffi.Struct {
 
   @ffi.Bool()
   external bool is_eol;
+}
+
+final class C_ImageBuffer extends ffi.Struct {
+  external ffi.Pointer<ffi.Uint8> imageData;
+
+  @ffi.Int()
+  external int length;
 }

@@ -256,7 +256,9 @@ class _ScanPageState extends State<ScanPage> {
               builder: (c) => const Center(child: CircularProgressIndicator())
             );
 
-            var success = await TextRecognitionPipeline().scanDocument(_capturedImage!);
+            final textRecognitionPipeline = TextRecognitionPipeline();
+            var success = await textRecognitionPipeline.scanDocument(_capturedImage!);
+            textRecognitionPipeline.done();
 
             if (context.mounted) Navigator.pop(context);
             if (mounted) {
