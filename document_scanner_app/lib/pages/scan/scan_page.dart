@@ -1,7 +1,11 @@
+import 'dart:io';
+
 import 'package:camera/camera.dart';
 import 'package:document_scanner_app/pages/settings/settings_page.dart';
 import 'package:document_scanner_app/service/pipeline/text_recognition_pipeline.dart';
 import 'package:flutter/material.dart';
+import 'package:text_recognition_pipeline/native_text_recognition_pipeline.dart';
+import 'package:document_scanner_app/util/utils.dart' as utils;
 
 class FlashModeMenuOption {
   final FlashMode flashMode;
@@ -25,8 +29,13 @@ extension StringExtensions on String {
 
 class ScanPage extends StatefulWidget {
   final CameraDescription camera;
+  final TextRecognitionPipeline textRecognitionPipeline;
 
-  const ScanPage({super.key, required this.camera});
+  const ScanPage({
+    super.key,
+    required this.camera,
+    required this.textRecognitionPipeline,
+  });
 
   @override
   State<ScanPage> createState() => _ScanPageState();
@@ -35,6 +44,13 @@ class ScanPage extends StatefulWidget {
 class _ScanPageState extends State<ScanPage> {
   late CameraController _controller;
   late Future<void> _initializeControllerFuture;
+  bool _grayscale = false;
+  bool _unsharpMasking = true;
+  bool _binary = false;
+  bool _dewarp = true;
+  bool _resize = true;
+  bool _useTopResultFromDictionary = false;
+  bool _useContext = false;
   XFile? _capturedImage;
   final List<FlashModeMenuOption> _flashModeOptions = [
     const FlashModeMenuOption(flashMode: FlashMode.off, icon: Icons.flash_off),
@@ -58,19 +74,34 @@ class _ScanPageState extends State<ScanPage> {
       _generateExposureOptions();
     });
     _selectedFlashMode = _flashModeOptions.first;
-    _selectedExposureOption = const ExposureMenuOption(label: 'Auto', value: null); 
+    _selectedExposureOption = const ExposureMenuOption(
+      label: 'Auto',
+      value: null,
+    );
   }
 
   void _generateExposureOptions() {
     List<ExposureMenuOption> options = [];
     options.add(const ExposureMenuOption(label: 'Auto', value: null));
     for (double value = -1.0; value < 0.0; value += 0.25) {
-      options.add(ExposureMenuOption(label: value.toString(), value: _minAvailableExposureOffset * value));
+      options.add(
+        ExposureMenuOption(
+          label: value.toString(),
+          value: _minAvailableExposureOffset * value,
+        ),
+      );
     }
     for (double value = 0.0; value <= 1.0; value += 0.25) {
-      options.add(ExposureMenuOption(label: '+$value', value: _maxAvailableExposureOffset * value));
+      options.add(
+        ExposureMenuOption(
+          label: '+$value',
+          value: _maxAvailableExposureOffset * value,
+        ),
+      );
     }
-    setState(() {_exposureOptions = options;});
+    setState(() {
+      _exposureOptions = options;
+    });
   }
 
   Future<void> _setExposure(ExposureMenuOption option) async {
@@ -78,7 +109,7 @@ class _ScanPageState extends State<ScanPage> {
       await _controller.setExposureMode(ExposureMode.auto);
       await _controller.setExposureOffset(0.0);
     } else {
-      await _controller.setExposureMode(ExposureMode.locked); 
+      await _controller.setExposureMode(ExposureMode.locked);
       await _controller.setExposureOffset(option.value!);
     }
     setState(() {
@@ -100,23 +131,23 @@ class _ScanPageState extends State<ScanPage> {
         MenuAnchor(
           builder:
               (BuildContext context, MenuController controller, Widget? child) {
-            return IconButton(
-              onPressed: () {
-                if (controller.isOpen) {
-                  controller.close();
-                } else {
-                  controller.open();
-                }
+                return IconButton(
+                  onPressed: () {
+                    if (controller.isOpen) {
+                      controller.close();
+                    } else {
+                      controller.open();
+                    }
+                  },
+                  icon: Icon(
+                    Icons.exposure,
+                    color: _selectedExposureOption.value == null
+                        ? Theme.of(context).colorScheme.onSurfaceVariant
+                        : Theme.of(context).colorScheme.primary,
+                  ),
+                  tooltip: ' Select Exposure',
+                );
               },
-              icon: Icon(
-                Icons.exposure,
-                color: _selectedExposureOption.value == null
-                    ? Theme.of(context).colorScheme.onSurfaceVariant
-                    : Theme.of(context).colorScheme.primary,
-              ),
-              tooltip: ' Select Exposure',
-            );
-          },
           menuChildren: _exposureOptions.map((option) {
             return MenuItemButton(
               onPressed: () => _setExposure(option),
@@ -232,6 +263,40 @@ class _ScanPageState extends State<ScanPage> {
     );
   }
 
+  Widget _buildConfigBtn({
+    required IconData icon,
+    required String text,
+    required bool config,
+    required VoidCallback onPressed,
+  }) {
+    return OutlinedButton.icon(
+      style: TextButton.styleFrom(
+        iconSize: 20,
+        side: BorderSide(
+          width: 1,
+          color: config
+              ? Theme.of(context).colorScheme.primary
+              : Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
+      ),
+      onPressed: onPressed,
+      icon: Icon(
+        icon,
+        color: config
+            ? Theme.of(context).colorScheme.primary
+            : Theme.of(context).colorScheme.onSurfaceVariant,
+      ),
+      label: Text(
+        text,
+        style: TextStyle(
+          color: config
+              ? Theme.of(context).colorScheme.primary
+              : Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
+      ),
+    );
+  }
+
   Widget _buildReviewControls() {
     return Row(
       key: const ValueKey('reviewState'),
@@ -239,7 +304,8 @@ class _ScanPageState extends State<ScanPage> {
       children: [
         _buildReviewBtn(
           icon: const Icon(Icons.close),
-          onPressed: () {
+          onPressed: () async {
+            await utils.deleteFile(File(_capturedImage?.path ?? ""));
             setState(() {
               _controller.resumePreview();
               _capturedImage = null;
@@ -251,15 +317,28 @@ class _ScanPageState extends State<ScanPage> {
           icon: const Icon(Icons.check),
           onPressed: () async {
             showDialog(
-              context: context, 
-              barrierDismissible: false, 
-              builder: (c) => const Center(child: CircularProgressIndicator())
+              context: context,
+              barrierDismissible: false,
+              builder: (c) => const Center(child: CircularProgressIndicator()),
             );
-
-            final textRecognitionPipeline = TextRecognitionPipeline();
-            var success = await textRecognitionPipeline.scanDocument(_capturedImage!);
-            textRecognitionPipeline.done();
-
+            widget.textRecognitionPipeline.setPreprocessingConfig(
+              PreprocessingConfig(
+                grayscale: _grayscale,
+                unsharpMasking: _unsharpMasking,
+                binary: _binary,
+                dewarp: _dewarp,
+                resize: _resize,
+              ),
+            );
+            widget.textRecognitionPipeline.setPostProcessingConfig(
+              PostprocessingConfig(
+                useTopResultFromDictionary: _useTopResultFromDictionary,
+                useContext: _useContext,
+              ),
+            );
+            var success = await widget.textRecognitionPipeline.scanDocument(
+              _capturedImage!,
+            );
             if (context.mounted) Navigator.pop(context);
             if (mounted) {
               Navigator.of(context).pop(success);
@@ -293,53 +372,208 @@ class _ScanPageState extends State<ScanPage> {
           ),
         ],
       ),
-      body: Column(
-        mainAxisAlignment: MainAxisAlignment.start,
-        children: [
-          FutureBuilder<void>(
-            future: _initializeControllerFuture,
-            builder: (context, snapshot) {
-              final isReady = snapshot.connectionState == ConnectionState.done;
-              final double aspectRatio = isReady
-                  ? 1 / _controller.value.aspectRatio
-                  : 3.0 / 4.0;
-              return AspectRatio(
-                aspectRatio: aspectRatio,
-                child: Container(
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    border: Border.all(
-                      color: Theme.of(context).colorScheme.primary,
-                      width: 3,
+      body: SafeArea(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.start,
+          children: [
+            FutureBuilder<void>(
+              future: _initializeControllerFuture,
+              builder: (context, snapshot) {
+                final isReady =
+                    snapshot.connectionState == ConnectionState.done;
+                final double aspectRatio = isReady
+                    ? 1 / _controller.value.aspectRatio
+                    : 3.0 / 4.0;
+                return AspectRatio(
+                  aspectRatio: aspectRatio,
+                  child: Container(
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        color: Theme.of(context).colorScheme.primary,
+                        width: 3,
+                      ),
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    borderRadius: BorderRadius.circular(12),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(9),
+                      child: isReady
+                          ? CameraPreview(_controller)
+                          : const Center(child: CircularProgressIndicator()),
+                    ),
                   ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(9),
-                    child: isReady
-                        ? CameraPreview(_controller)
-                        : const Center(child: CircularProgressIndicator()),
-                  ),
-                ),
-              );
-            },
-          ),
-          Row(), // TODO: preprocessing and postprocessing configurations here
-          Expanded(
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 150),
-              transitionBuilder: (Widget child, Animation<double> animation) {
-                return FadeTransition(
-                  opacity: animation,
-                  child: ScaleTransition(scale: animation, child: child),
                 );
               },
-              child: _capturedImage != null
-                  ? _buildReviewControls()
-                  : _buildCaptureControls(),
             ),
-          ),
-        ],
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  OutlinedButton.icon(
+                    style: TextButton.styleFrom(
+                      iconSize: 30,
+                      side: BorderSide(
+                        width: 1,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
+                    onPressed: () {
+                      showModalBottomSheet(
+                        context: context,
+                        builder: (BuildContext context) {
+                          return StatefulBuilder(
+                            builder: (BuildContext context, StateSetter setModalState) {
+                              return SafeArea(
+                                child: SingleChildScrollView(
+                                  child: Padding(
+                                    padding: const EdgeInsets.fromLTRB(
+                                      16,
+                                      12,
+                                      16,
+                                      24,
+                                    ),
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          "Preprocessing",
+                                          style: Theme.of(
+                                            context,
+                                          ).textTheme.titleLarge,
+                                        ),
+                                        const SizedBox(height: 12),
+                                        Wrap(
+                                          spacing: 10,
+                                          runSpacing: 10,
+                                          alignment: WrapAlignment.start,
+                                          children: [
+                                            _buildConfigBtn(
+                                              icon:
+                                                  Icons.filter_b_and_w_outlined,
+                                              text: "Grayscale",
+                                              config: _grayscale,
+                                              onPressed: () {
+                                                setModalState(() {
+                                                  _grayscale = !_grayscale;
+                                                });
+                                              },
+                                            ),
+                                            _buildConfigBtn(
+                                              icon: Icons.high_quality,
+                                              text: "Unsharp Mask",
+                                              config: _unsharpMasking,
+                                              onPressed: () {
+                                                setModalState(() {
+                                                  _unsharpMasking =
+                                                      !_unsharpMasking;
+                                                });
+                                              },
+                                            ),
+                                            _buildConfigBtn(
+                                              icon: Icons.contrast,
+                                              text: "Binary",
+                                              config: _binary,
+                                              onPressed: () {
+                                                setModalState(() {
+                                                  _binary = !_binary;
+                                                });
+                                              },
+                                            ),
+                                            _buildConfigBtn(
+                                              icon: Icons.transform,
+                                              text: "Dewarp",
+                                              config: _dewarp,
+                                              onPressed: () {
+                                                setModalState(() {
+                                                  _dewarp = !_dewarp;
+                                                });
+                                              },
+                                            ),
+                                            _buildConfigBtn(
+                                              icon: Icons.aspect_ratio,
+                                              text: "Resize",
+                                              config: _resize,
+                                              onPressed: () {
+                                                setModalState(() {
+                                                  _resize = !_resize;
+                                                });
+                                              },
+                                            ),
+                                          ],
+                                        ),
+                                        const Divider(),
+                                        Text(
+                                          "Postprocessing",
+                                          style: Theme.of(
+                                            context,
+                                          ).textTheme.titleLarge,
+                                        ),
+                                        const SizedBox(height: 12),
+                                        Wrap(
+                                          spacing: 10,
+                                          runSpacing: 10,
+                                          alignment: WrapAlignment.start,
+                                          children: [
+                                            _buildConfigBtn(
+                                              icon: Icons.spellcheck,
+                                              text: "Dictionary",
+                                              config:
+                                                  _useTopResultFromDictionary,
+                                              onPressed: () {
+                                                setModalState(() {
+                                                  _useTopResultFromDictionary =
+                                                      !_useTopResultFromDictionary;
+                                                });
+                                              },
+                                            ),
+                                            _buildConfigBtn(
+                                              icon: Icons.text_fields,
+                                              text: "Context",
+                                              config: _useContext,
+                                              onPressed: () {
+                                                setModalState(() {
+                                                  _useContext = !_useContext;
+                                                });
+                                              },
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          );
+                        },
+                      );
+                    },
+                    icon: Icon(Icons.document_scanner),
+                    label: Text("Scan Options"),
+                  ),
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 150),
+                    transitionBuilder:
+                        (Widget child, Animation<double> animation) {
+                          return FadeTransition(
+                            opacity: animation,
+                            child: ScaleTransition(
+                              scale: animation,
+                              child: child,
+                            ),
+                          );
+                        },
+                    child: _capturedImage != null
+                        ? _buildReviewControls()
+                        : _buildCaptureControls(),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

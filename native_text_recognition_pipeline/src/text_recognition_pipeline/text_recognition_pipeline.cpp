@@ -211,7 +211,14 @@ void TextRecognitionPipeline::postprocessingStep(PostprocessingConfig config) {
     if (this->tesseractRecognitionResult != nullptr) {
         std::string previousWord;
         do {
-            std::string word = this->tesseractRecognitionResult->GetUTF8Text(level);
+            char* rawText = this->tesseractRecognitionResult->GetUTF8Text(level);
+            std::string word;
+            if (rawText != nullptr) {
+                word = std::string(rawText);
+                delete[] rawText;
+            } else {
+                continue;
+            }
             if (config.useTopResultFromDictionary) word = replaceWithTopResult(word);
             if (config.useContext) word = replaceWithContext(previousWord, word);
             int x1, y1, x2, y2;

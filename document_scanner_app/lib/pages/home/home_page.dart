@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:camera/camera.dart';
+import 'package:document_scanner_app/service/pipeline/text_recognition_pipeline.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
@@ -12,8 +13,9 @@ import 'package:document_scanner_app/pages/settings/settings_page.dart';
 
 class HomePage extends StatefulWidget {
   final CameraDescription camera;
+  final TextRecognitionPipeline textRecognitionPipeline;
 
-  const HomePage({super.key, required this.camera});
+  const HomePage({super.key, required this.camera, required this.textRecognitionPipeline});
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -128,7 +130,7 @@ class _HomePageState extends State<HomePage> {
   void _navigateToScanPage() {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => ScanPage(camera: widget.camera)),
+      MaterialPageRoute(builder: (context) => ScanPage(camera: widget.camera, textRecognitionPipeline: widget.textRecognitionPipeline)),
     ).then((success) async {
       if (success == true) await _loadPdfFiles();
     });

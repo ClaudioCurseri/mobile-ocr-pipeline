@@ -7,7 +7,10 @@ import 'dart:ui' as ui;
 
 import 'package:text_recognition_pipeline/native_text_recognition_pipeline.dart';
 
-Future<bool> createSearchablePdf(Uint8List imageBytes, List<RecognitionResult> items) async {
+Future<bool> createSearchablePdf(
+  Uint8List imageBytes,
+  List<RecognitionResult> items,
+) async {
   final pdf = pw.Document();
   final pdfImage = pw.MemoryImage(imageBytes);
 
@@ -18,10 +21,10 @@ Future<bool> createSearchablePdf(Uint8List imageBytes, List<RecognitionResult> i
 
   final validItems = items.where((item) {
     return item.text.trim().isNotEmpty &&
-           item.width > 0 && 
-           item.height > 0 &&
-           !item.x.isNaN && 
-           !item.y.isNaN;
+        item.width > 0 &&
+        item.height > 0 &&
+        !item.x.isNaN &&
+        !item.y.isNaN;
   }).toList();
 
   pdf.addPage(
@@ -35,7 +38,7 @@ Future<bool> createSearchablePdf(Uint8List imageBytes, List<RecognitionResult> i
               ignoreMargins: true,
               child: pw.Image(pdfImage, fit: pw.BoxFit.cover),
             ),
-            
+
             ...validItems.map((item) {
               return pw.Positioned(
                 left: item.x.toDouble(),
@@ -70,6 +73,16 @@ Future<String> get _localPath async {
 Future<File> setLocalFileReference(String fileName) async {
   final path = await _localPath;
   return File('$path/$fileName');
+}
+
+Future<void> deleteFile(File file) async {
+  try {
+    if (await file.exists()) {
+      await file.delete();
+    }
+  } catch (e) {
+    // Error in getting access to the file.
+  }
 }
 
 Future<bool> writeFile(pw.Document pdf) async {
