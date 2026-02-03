@@ -21,6 +21,7 @@ dependencies:
     path: ../native_text_recognition_pipeline/
   flutter_slidable: ^4.0.3
   share_plus: ^12.0.1
+  shared_preferences: ^2.5.4
 
 dev_dependencies:
   flutter_test:

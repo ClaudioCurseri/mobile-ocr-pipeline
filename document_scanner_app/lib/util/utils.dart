@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:ui' as ui;
 
 import 'package:text_recognition_pipeline/native_text_recognition_pipeline.dart';
@@ -11,6 +12,9 @@ Future<bool> createSearchablePdf(
   Uint8List imageBytes,
   List<RecognitionResult> items,
 ) async {
+  final prefs = await SharedPreferences.getInstance();
+  final showTextOnScan = prefs.getBool('showTextOnScan') ?? false;
+
   final pdf = pw.Document();
   final pdfImage = pw.MemoryImage(imageBytes);
 
@@ -49,8 +53,9 @@ Future<bool> createSearchablePdf(
                   child: pw.Text(
                     item.text,
                     style: pw.TextStyle(
-                      renderingMode: PdfTextRenderingMode.invisible,
+                      renderingMode: showTextOnScan ? null : PdfTextRenderingMode.invisible,
                       fontSize: item.height > 0 ? item.height.toDouble() : 1.0,
+                      color: PdfColors.red
                     ),
                   ),
                 ),
