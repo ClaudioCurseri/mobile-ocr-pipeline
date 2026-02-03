@@ -15,6 +15,8 @@ Future<void> main() async {
 
   final TextRecognitionPipeline textRecognitionPipeline = TextRecognitionPipeline();
   await textRecognitionPipeline.initialize();
+  await textRecognitionPipeline.initUnigramDictionaries();
+  await textRecognitionPipeline.initBigramDictionaries();
 
   runApp(MainApp(camera: firstCamera, textRecognitionPipeline: textRecognitionPipeline));
 }

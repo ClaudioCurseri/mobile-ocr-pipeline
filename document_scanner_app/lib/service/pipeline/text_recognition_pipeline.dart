@@ -29,9 +29,10 @@ class TextRecognitionPipeline {
 
   Future<bool> initBigramDictionaries() async {
     if (bigramDictionariesInitialized) return true;
-    final initialized = await textRecognitionPipeline.initBigramDictionaries();
-    bigramDictionariesInitialized = initialized;
-    return initialized;
+    final initializedUnigrams = await textRecognitionPipeline.initUnigramDictionaries();
+    final initializedBigrams = await textRecognitionPipeline.initBigramDictionaries();
+    bigramDictionariesInitialized = initializedUnigrams && initializedBigrams;
+    return bigramDictionariesInitialized;
   }
 
   Future<bool> scanDocument(XFile file) async {

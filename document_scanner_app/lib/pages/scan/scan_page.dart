@@ -78,9 +78,6 @@ class _ScanPageState extends State<ScanPage> {
       label: 'Auto',
       value: null,
     );
-    _useTopResultFromDictionary =
-        widget.textRecognitionPipeline.unigramDictionariesInitialized;
-    _useContext = widget.textRecognitionPipeline.bigramDictionariesInitialized;
   }
 
   void _generateExposureOptions() {
@@ -424,158 +421,128 @@ class _ScanPageState extends State<ScanPage> {
                       showModalBottomSheet(
                         context: context,
                         builder: (BuildContext context) {
-                          bool loadingDictionary = false;
                           return StatefulBuilder(
                             builder: (BuildContext context, StateSetter setModalState) {
                               return SafeArea(
-                                child: Stack(
-                                  children: [
-                                    SingleChildScrollView(
-                                      child: Padding(
-                                        padding: const EdgeInsets.fromLTRB(
-                                          16,
-                                          12,
-                                          16,
-                                          24,
+                                child: SingleChildScrollView(
+                                  child: Padding(
+                                    padding: const EdgeInsets.fromLTRB(
+                                      16,
+                                      12,
+                                      16,
+                                      24,
+                                    ),
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          "Preprocessing",
+                                          style: Theme.of(
+                                            context,
+                                          ).textTheme.titleLarge,
                                         ),
-                                        child: Column(
-                                          mainAxisSize: MainAxisSize.min,
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
+                                        const SizedBox(height: 12),
+                                        Wrap(
+                                          spacing: 10,
+                                          runSpacing: 10,
+                                          alignment: WrapAlignment.start,
                                           children: [
-                                            if (loadingDictionary)
-                                              const Padding(
-                                                padding: EdgeInsets.only(
-                                                  bottom: 8.0,
-                                                ),
-                                                child:
-                                                    LinearProgressIndicator(),
-                                              ),
-                                            Text(
-                                              "Preprocessing",
-                                              style: Theme.of(
-                                                context,
-                                              ).textTheme.titleLarge,
+                                            _buildConfigBtn(
+                                              icon:
+                                                  Icons.filter_b_and_w_outlined,
+                                              text: "Grayscale",
+                                              config: _grayscale,
+                                              onPressed: () {
+                                                setModalState(() {
+                                                  _grayscale = !_grayscale;
+                                                });
+                                              },
                                             ),
-                                            const SizedBox(height: 12),
-                                            Wrap(
-                                              spacing: 10,
-                                              runSpacing: 10,
-                                              alignment: WrapAlignment.start,
-                                              children: [
-                                                _buildConfigBtn(
-                                                  icon: Icons
-                                                      .filter_b_and_w_outlined,
-                                                  text: "Grayscale",
-                                                  config: _grayscale,
-                                                  onPressed: loadingDictionary ? () {} : () {
-                                                    setModalState(() {
-                                                      _grayscale = !_grayscale;
-                                                    });
-                                                  },
-                                                ),
-                                                _buildConfigBtn(
-                                                  icon: Icons.high_quality,
-                                                  text: "Unsharp Mask",
-                                                  config: _unsharpMasking,
-                                                  onPressed: loadingDictionary ? () {} : () {
-                                                    setModalState(() {
-                                                      _unsharpMasking =
-                                                          !_unsharpMasking;
-                                                    });
-                                                  },
-                                                ),
-                                                _buildConfigBtn(
-                                                  icon: Icons.contrast,
-                                                  text: "Binary",
-                                                  config: _binary,
-                                                  onPressed: loadingDictionary ? () {} : () {
-                                                    setModalState(() {
-                                                      _binary = !_binary;
-                                                    });
-                                                  },
-                                                ),
-                                                _buildConfigBtn(
-                                                  icon: Icons.transform,
-                                                  text: "Dewarp",
-                                                  config: _dewarp,
-                                                  onPressed: loadingDictionary ? () {} : () {
-                                                    setModalState(() {
-                                                      _dewarp = !_dewarp;
-                                                    });
-                                                  },
-                                                ),
-                                                _buildConfigBtn(
-                                                  icon: Icons.aspect_ratio,
-                                                  text: "Resize",
-                                                  config: _resize,
-                                                  onPressed: loadingDictionary ? () {} : () {
-                                                    setModalState(() {
-                                                      _resize = !_resize;
-                                                    });
-                                                  },
-                                                ),
-                                              ],
+                                            _buildConfigBtn(
+                                              icon: Icons.high_quality,
+                                              text: "Unsharp Mask",
+                                              config: _unsharpMasking,
+                                              onPressed: () {
+                                                setModalState(() {
+                                                  _unsharpMasking =
+                                                      !_unsharpMasking;
+                                                });
+                                              },
                                             ),
-                                            const Divider(),
-                                            Text(
-                                              "Postprocessing",
-                                              style: Theme.of(
-                                                context,
-                                              ).textTheme.titleLarge,
+                                            _buildConfigBtn(
+                                              icon: Icons.contrast,
+                                              text: "Binary",
+                                              config: _binary,
+                                              onPressed: () {
+                                                setModalState(() {
+                                                  _binary = !_binary;
+                                                });
+                                              },
                                             ),
-                                            const SizedBox(height: 12),
-                                            Wrap(
-                                              spacing: 10,
-                                              runSpacing: 10,
-                                              alignment: WrapAlignment.start,
-                                              children: [
-                                                _buildConfigBtn(
-                                                  icon: Icons.spellcheck,
-                                                  text: "Dictionary",
-                                                  config:
-                                                      _useTopResultFromDictionary,
-                                                  onPressed: loadingDictionary ? () {} : () async {
-                                                    setModalState(() => loadingDictionary = true);
-                                                    var dictionaryLoaded =
-                                                        _useTopResultFromDictionary;
-                                                    if (!dictionaryLoaded) {
-                                                      dictionaryLoaded = await widget
-                                                          .textRecognitionPipeline
-                                                          .initUnigramDictionaries();
-                                                    }
-                                                    setModalState(() {
-                                                      _useTopResultFromDictionary =
-                                                          dictionaryLoaded;
-                                                      loadingDictionary = false;
-                                                    });
-                                                  },
-                                                ),
-                                                _buildConfigBtn(
-                                                  icon: Icons.text_fields,
-                                                  text: "Context",
-                                                  config: _useContext,
-                                                  onPressed: loadingDictionary ? () {} : () async {
-                                                    setModalState(() => loadingDictionary = true);
-                                                    var dictionaryLoaded = _useContext;
-                                                    if (!dictionaryLoaded) {
-                                                      dictionaryLoaded = await widget
-                                                          .textRecognitionPipeline
-                                                          .initBigramDictionaries();
-                                                    }
-                                                    setModalState(() {
-                                                      _useContext = dictionaryLoaded;
-                                                      loadingDictionary = false;
-                                                    });
-                                                  },
-                                                ),
-                                              ],
+                                            _buildConfigBtn(
+                                              icon: Icons.transform,
+                                              text: "Dewarp",
+                                              config: _dewarp,
+                                              onPressed: () {
+                                                setModalState(() {
+                                                  _dewarp = !_dewarp;
+                                                });
+                                              },
+                                            ),
+                                            _buildConfigBtn(
+                                              icon: Icons.aspect_ratio,
+                                              text: "Resize",
+                                              config: _resize,
+                                              onPressed: () {
+                                                setModalState(() {
+                                                  _resize = !_resize;
+                                                });
+                                              },
                                             ),
                                           ],
                                         ),
-                                      ),
+                                        const Divider(),
+                                        Text(
+                                          "Postprocessing",
+                                          style: Theme.of(
+                                            context,
+                                          ).textTheme.titleLarge,
+                                        ),
+                                        const SizedBox(height: 12),
+                                        Wrap(
+                                          spacing: 10,
+                                          runSpacing: 10,
+                                          alignment: WrapAlignment.start,
+                                          children: [
+                                            _buildConfigBtn(
+                                              icon: Icons.spellcheck,
+                                              text: "Dictionary",
+                                              config:
+                                                  _useTopResultFromDictionary,
+                                              onPressed: () {
+                                                setModalState(() {
+                                                  _useTopResultFromDictionary =
+                                                      !_useTopResultFromDictionary;
+                                                });
+                                              },
+                                            ),
+                                            _buildConfigBtn(
+                                              icon: Icons.text_fields,
+                                              text: "Context",
+                                              config: _useContext,
+                                              onPressed: () {
+                                                setModalState(() {
+                                                  _useContext = !_useContext;
+                                                });
+                                              },
+                                            ),
+                                          ],
+                                        ),
+                                      ],
                                     ),
-                                  ],
+                                  ),
                                 ),
                               );
                             },
