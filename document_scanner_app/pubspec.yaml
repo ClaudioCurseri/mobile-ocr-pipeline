@@ -34,3 +34,4 @@ flutter:
     - assets/tessdata/eng.traineddata
     - assets/unigram/
     - assets/bigram/
+    - assets/fonts/
