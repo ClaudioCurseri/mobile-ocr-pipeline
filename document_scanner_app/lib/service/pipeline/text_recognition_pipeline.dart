@@ -5,6 +5,8 @@ import 'package:text_recognition_pipeline/native_text_recognition_pipeline.dart'
 class TextRecognitionPipeline {
   final NativeTextRecognitionPipeline textRecognitionPipeline =
       NativeTextRecognitionPipeline();
+  var unigramDictionariesInitialized = false;
+  var bigramDictionariesInitialized = false;
 
   Future<void> initialize() async {
     await textRecognitionPipeline.initTesseract();
@@ -16,6 +18,20 @@ class TextRecognitionPipeline {
 
   void setPostProcessingConfig(PostprocessingConfig config) {
     textRecognitionPipeline.setPostprocessingConfig(config);
+  }
+
+  Future<bool> initUnigramDictionaries() async {
+    if (unigramDictionariesInitialized) return true;
+    final initialized = await textRecognitionPipeline.initUnigramDictionaries();
+    unigramDictionariesInitialized = initialized;
+    return initialized;
+  }
+
+  Future<bool> initBigramDictionaries() async {
+    if (bigramDictionariesInitialized) return true;
+    final initialized = await textRecognitionPipeline.initBigramDictionaries();
+    bigramDictionariesInitialized = initialized;
+    return initialized;
   }
 
   Future<bool> scanDocument(XFile file) async {

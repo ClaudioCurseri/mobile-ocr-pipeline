@@ -13,7 +13,6 @@ class NativeTextRecognitionPipeline {
   late Pointer<C_PreprocessingConfig> preprocessingConfig;
   late Pointer<C_PostprocessingConfig> postprocessingConfig;
 
-
   NativeTextRecognitionPipeline() {
     textRecognitionPipeline = TextRecognition_create();
     preprocessingConfig = calloc<C_PreprocessingConfig>();
@@ -60,7 +59,8 @@ class NativeTextRecognitionPipeline {
   }
 
   void setPostprocessingConfig(PostprocessingConfig config) {
-    postprocessingConfig.ref.useTopResultFromDictionary = config.useTopResultFromDictionary;
+    postprocessingConfig.ref.useTopResultFromDictionary =
+        config.useTopResultFromDictionary;
     postprocessingConfig.ref.useContext = config.useContext;
   }
 
@@ -74,49 +74,121 @@ class NativeTextRecognitionPipeline {
 
     final filePath = '${tessDataFolder.path}/eng.traineddata';
     final file = File(filePath);
-    
+
     if (!await file.exists()) {
       final byteData = await rootBundle.load('assets/tessdata/eng.traineddata');
-      await file.writeAsBytes(byteData.buffer.asUint8List(
-        byteData.offsetInBytes, 
-        byteData.lengthInBytes
-      ));
+      await file.writeAsBytes(
+        byteData.buffer.asUint8List(
+          byteData.offsetInBytes,
+          byteData.lengthInBytes,
+        ),
+      );
     }
 
     final cPath = tessDataFolder.path.toNativeUtf8();
-    
+
     try {
-      TextRecognition_initTesseract(textRecognitionPipeline, cPath.cast()); 
+      TextRecognition_initTesseract(textRecognitionPipeline, cPath.cast());
     } finally {
       calloc.free(cPath);
     }
   }
 
-  void initUnigramDictionary(String path) {
-    final cPath = path.toNativeUtf8();
+  Future<bool> initUnigramDictionaries() async {
+    var success = false;
 
-    try {
-      TextRecognition_initUnigramDictionary(textRecognitionPipeline, cPath.cast());
-    } finally {
-      calloc.free(cPath);
+    final directory = await getApplicationDocumentsDirectory();
+
+    final dictionaryFolder = Directory('${directory.path}/unigram');
+    if (!await dictionaryFolder.exists()) {
+      await dictionaryFolder.create(recursive: true);
     }
+
+    final unigramDictionaries = ['frequency_dictionary_en_82_765.txt'];
+
+    for (var dictionary in unigramDictionaries) {
+      final filePath = '${directory.path}/unigram/$dictionary';
+      final file = File(filePath);
+      if (!await file.parent.exists()) {
+        await file.parent.create(recursive: true);
+      }
+      if (!await file.exists()) {
+        final byteData = await rootBundle.load('assets/unigram/$dictionary');
+        await file.writeAsBytes(
+          byteData.buffer.asUint8List(
+            byteData.offsetInBytes,
+            byteData.lengthInBytes,
+          ),
+        );
+      }
+      final cPath = filePath.toNativeUtf8();
+      try {
+        success =
+            await Isolate.run<int>(() {
+              return TextRecognition_initUnigramDictionary(
+                textRecognitionPipeline,
+                cPath.cast(),
+              );
+            }) ==
+            0;
+      } catch (e) {
+        print(e);
+      } finally {
+        calloc.free(cPath);
+      }
+    }
+    return success;
   }
 
-  void initBigramDictionary(String path) {
-    final cPath = path.toNativeUtf8();
+  Future<bool> initBigramDictionaries() async {
+    var success = false;
 
-    try {
-      TextRecognition_initBigramDictionary(textRecognitionPipeline, cPath.cast());
-    } finally {
-      calloc.free(cPath);
+    final directory = await getApplicationDocumentsDirectory();
+
+    final dictionaryFolder = Directory('${directory.path}/bigram');
+    if (!await dictionaryFolder.exists()) {
+      await dictionaryFolder.create(recursive: true);
     }
+
+    final bigramDictionaries = ['frequency_bigramdictionary_en_243_342.txt'];
+
+    for (var dictionary in bigramDictionaries) {
+      final filePath = '${directory.path}/bigram/$dictionary';
+      final file = File(filePath);
+      if (!await file.parent.exists()) {
+        await file.parent.create(recursive: true);
+      }
+      if (!await file.exists()) {
+        final byteData = await rootBundle.load('assets/bigram/$dictionary');
+        await file.writeAsBytes(
+          byteData.buffer.asUint8List(
+            byteData.offsetInBytes,
+            byteData.lengthInBytes,
+          ),
+        );
+      }
+      final cPath = filePath.toNativeUtf8();
+      try {
+        success =
+            await Isolate.run<int>(() {
+              return TextRecognition_initBigramDictionary(
+                textRecognitionPipeline,
+                cPath.cast(),
+              );
+            }) ==
+            0;
+      } finally {
+        calloc.free(cPath);
+      }
+    }
+    return success;
   }
 
   Future<void> preprocessingStep() async {
     final ptr = textRecognitionPipeline;
     final config = preprocessingConfig.ref;
     await Isolate.run(() {
-      TextRecognition_preprocessingStep(ptr, config); 
+      TextRecognition_preprocessingStep(ptr, config);
     });
   }
 
@@ -146,14 +218,16 @@ class NativeTextRecognitionPipeline {
 
       final word = item.word.cast<Utf8>().toDartString();
 
-      results.add(RecognitionResult(
-        text: word,
-        x: item.x1,
-        y: item.y1,
-        width: item.x2 - item.x1,
-        height: item.y2 - item.y1,
-        isEndOfLine: item.is_eol
-      ));
+      results.add(
+        RecognitionResult(
+          text: word,
+          x: item.x1,
+          y: item.y1,
+          width: item.x2 - item.x1,
+          height: item.y2 - item.y1,
+          isEndOfLine: item.is_eol,
+        ),
+      );
     }
     return results;
   }
@@ -171,7 +245,7 @@ class PreprocessingConfig {
     required this.unsharpMasking,
     required this.binary,
     required this.dewarp,
-    required this.resize
+    required this.resize,
   });
 }
 
@@ -181,7 +255,7 @@ class PostprocessingConfig {
 
   PostprocessingConfig({
     required this.useTopResultFromDictionary,
-    required this.useContext
+    required this.useContext,
   });
 }
 
