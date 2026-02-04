@@ -1,0 +1,39 @@
+name: scan_local
+description: "An On-Device OCR Document Scanner App."
+publish_to: 'none'
+version: 0.1.0
+
+platforms:
+  android:
+  ios:
+
+environment:
+  sdk: ^3.10.7
+
+dependencies:
+  flutter:
+    sdk: flutter
+  camera: ^0.11.3
+  path_provider: ^2.1.5
+  path: ^1.9.1
+  html: ^0.15.6
+  pdf: ^3.11.3
+  flutter_pdfview: ^1.3.2
+  text_recognition_pipeline:
+    path: ../native_text_recognition_pipeline/
+  flutter_slidable: ^4.0.3
+  share_plus: ^12.0.1
+  shared_preferences: ^2.5.4
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/tessdata/eng.traineddata
+    - assets/unigram/
+    - assets/bigram/
+    - assets/fonts/

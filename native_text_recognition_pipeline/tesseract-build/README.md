@@ -9,7 +9,7 @@ This file explains how to compile Tesseract and Leptonica from source in order t
 
 ### 1. Building Tesseract and Leptonica From Source
 
-Follow these steps to compile Tesseract and Leptonica from source using the provided `build_tesseract.sh` script.
+Follow these steps to compile Tesseract and Leptonica from source using the provided `build_android.sh` script.
 
 #### 1.1 Clone The Git Repositories
 
@@ -54,12 +54,12 @@ endif()
 #### 1.4 Run The Script
 
 ```bash
-./build_tesseract.sh
+./build_android.sh
 ```
 
 ### 2. Integrate Tesseract And Leptonica
 
-The build script will produce two directories with files that are relevant:
+Inside the `install` directory, the build script will produce two directories with files that are relevant:
 
 - include/
    - contains all headers from Tesseract and Leptonica
@@ -88,4 +88,42 @@ The shared library has to be placed in this location:
 
 ## iOS
 
-TODO
+- Goal: Acquire all required static libraries (.a) and Headers (.h/.hpp) from the XCFrameworks (.framework/.xcframework).
+- Make sure that all the required programs are installed on your system in order to follow the next steps.
+
+### 1. Building Tesseract and Leptonica From Source
+
+Follow these steps to compile Tesseract and Leptonica from source using the provided `build_ios.sh` script. Make sure that Xcode and CMake are installed.
+
+#### 1.1 Clone The Git Repositories
+
+```bash
+git clone --depth 1 --branch 5.3.4 git@github.com:tesseract-ocr/tesseract.git
+
+git clone --depth 1 git@github.com:DanBloomberg/leptonica.git
+```
+
+#### 1.2 Run The Script
+
+```bash
+./build_ios.sh
+```
+
+### 2. Integrate Tesseract And Leptonica
+
+Inside the `install_ios/xcframeworks/` directory, the build script will produce a directories with files that are relevant:
+
+- leptonica.xcframework/
+   - Created XCFramework for Leptonica
+- tesseract.xcframework/
+   - Created XCFramework for Tesseract
+
+Place the XCFrameworks in this location:
+
+- native_text_recognition_pipeline/src/text_recognition_pipeline/third_party/iOS/xcframeworks/
+
+### 3. Integrate OpenCV
+
+Download the iOS sdk. Then, place `opencv2.framework` in this location:
+
+- native_text_recognition_pipeline/src/text_recognition_pipeline/third_party/iOS/xcframeworks/

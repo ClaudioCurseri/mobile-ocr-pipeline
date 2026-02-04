@@ -1,24 +1,21 @@
-# native_add
+# Native Text Recognition Pipeline
 
-A new Dart FFI package project.
-
-## Getting Started
-
-This project is a starting point for a Flutter
-[FFI package](https://flutter.dev/to/ffi-package),
-a specialized package that includes native code directly invoked with Dart FFI.
+A Dart FFI Project that binds a C++ implementation of an OCR Pipeline to native code.
 
 ## Project structure
 
-This template uses the following structure:
+This project uses the following structure:
 
-* `src`: Contains the native source code, and a CmakeFile.txt file for building
-  that source code into a dynamic library.
+* `src`: Contains the native source code. The code can be executed on your system using the CMakeLists.txt to run a main.cpp file that will run the pipeline against a test dataset.
 
 * `lib`: Contains the Dart code that defines the API of the plugin, and which
   calls into the native code using `dart:ffi`.
 
 * `bin`: Contains the `build.dart` that performs the external native builds.
+
+* `hook`: Contains a `build.dart` file.
+
+* `tesseract-build`: Contains shell scripts to compile Tesseract and Leptonica from source. See the README inside for more details.
 
 ## Building and bundling native code
 
@@ -29,21 +26,4 @@ Bundling is done by Flutter based on the output from `build.dart`.
 ## Binding to native code
 
 To use the native code, bindings in Dart are needed.
-To avoid writing these by hand, they are generated from the header file
-(`src/native_add.h`) by `package:ffigen`.
 Regenerate the bindings by running `dart run ffigen --config ffigen.yaml`.
-
-## Invoking native code
-
-Very short-running native functions can be directly invoked from any isolate.
-For example, see `sum` in `lib/native_add.dart`.
-
-Longer-running functions should be invoked on a helper isolate to avoid
-dropping frames in Flutter applications.
-For example, see `sumAsync` in `lib/native_add.dart`.
-
-## Flutter help
-
-For help getting started with Flutter, view our
-[online documentation](https://docs.flutter.dev), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
