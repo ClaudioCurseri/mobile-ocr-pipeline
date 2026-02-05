@@ -8,9 +8,9 @@ TextRecognitionPipeline::~TextRecognitionPipeline() {
 
 void TextRecognitionPipeline::preprocessingStep(const PreprocessingConfig config) {
     if (config.grayscale) convertToGrayscale();
+    if (config.dewarp) dewarpImage();
     if (config.unsharpMasking) unsharpMasking();
     if (config.binary) convertToBinaryImage();
-    if (config.dewarp) dewarpImage();
     if (config.resize) resizeImage();
     this->image = this->internalImage.clone();
     this->api->SetImage(this->internalImage.data, this->internalImage.cols, this->internalImage.rows, this->internalImage.channels(), this->internalImage.step);
@@ -72,15 +72,26 @@ std::vector<cv::Point2f> orderPoints(const std::vector<cv::Point>& pts) {
 }
 
 void TextRecognitionPipeline::dewarpImage() {
+    // make sure we always work with a grayscale image to detect the edges better
+    cv::Mat gray;
+    cv::cvtColor(this->image, gray, cv::COLOR_RGB2GRAY);
+
+    cv::GaussianBlur(gray, gray, cv::Size(5, 5), 0);
+
     // edge detection
     cv::Mat edged;
-    cv::Canny(this->internalImage, edged, 75, 200);
+    cv::Canny(gray, edged, 75, 200);
+
+    // edge detection was too strict and made the picture mostly black?
+    // -> then try again with lower thresholds
+    if (cv::countNonZero(edged) < 200000) {
+        cv::Canny(gray, edged, 30, 100);
+    }
 
     // dilation -> all structures grow, increases chance of finding the document contours
     cv::Mat dilated;
     cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(11, 11));
     cv::dilate(edged, dilated, kernel, cv::Point(-1, -1), 1);
-
     // find all contours
     std::vector<std::vector<cv::Point>> contours;
     cv::findContours(dilated, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
@@ -98,23 +109,35 @@ void TextRecognitionPipeline::dewarpImage() {
 
     // find the document contours
     for (const auto& contour : contours) {
+        double area = cv::contourArea(contour);
         // do not accept contours that are too small
-        if (double area = cv::contourArea(contour); area < imageArea * 0.1) {
+        if ( area < imageArea * 0.1) {
             continue;
         }
 
         double perimeter = cv::arcLength(contour, true);
         std::vector<cv::Point> approx;
+        // try to find four contours
+        for (double epsilon = 0.02; epsilon <= 0.05; epsilon += 0.01) {
+            cv::approxPolyDP(contour, approx, epsilon * perimeter, true);
 
-        cv::approxPolyDP(contour, approx, 0.03 * perimeter, true);
-
-        if (approx.size() == 4) {
-            documentContour = approx;
+            if (approx.size() == 4) {
+                    documentContour = approx;
+                    found = true;
+                    goto end_search;
+            }
+        }
+        // did not find four contours? -> try to use the min rect within the given points
+        if (area > imageArea * 0.2) {
+            cv::RotatedRect rect = cv::minAreaRect(contour);
+            cv::Point2f pts[4];
+            rect.points(pts);
+            for (auto pt : pts) documentContour.push_back(pt);
             found = true;
-            break;
+            goto end_search;
         }
     }
-
+end_search:
     // document contours not found
     if (!found) {
         std::cerr << "Unable to find document contours. Returning original image." << std::endl;
@@ -251,6 +274,15 @@ bool isEqOrShorterThan(const std::string &word, int maxLen) {
     return word.length() <= maxLen;
 }
 
+std::string cleanWordForLookup(std::string text) {
+    // remove punctuation
+    std::erase_if(text, [](const char c) { return std::ispunct(c); });
+    // to lowercase
+    std::ranges::transform(text, text.begin(),
+                           [](unsigned char c){ return std::tolower(c); });
+    return text;
+}
+
 bool containsPunctuationAtStartOrEnd(const std::string &word) {
     return word.starts_with("(") or word.ends_with(")")
     or word.ends_with(".") or word.ends_with("!") or word.ends_with("?")
@@ -265,10 +297,10 @@ bool containsPunctuationAtStartOrEnd(const std::string &word) {
 // - the word is capitalized
 std::string TextRecognitionPipeline::replaceWithTopResult(const std::string &word) const {
     if (isNotAlphanumeric(word) or isNumber(word)
-        or containsPunctuationAtStartOrEnd(word) or isEqOrShorterThan(word, 2)
+         or isEqOrShorterThan(word, 2)
         or std::isupper(word[0])) return word;
     std::string replacement = word;
-    for (const auto suggestion = this->symspell->lookup(word, yams::symspell::Verbosity::Top, 1); const auto& s : suggestion) {
+    for (const auto suggestion = this->symspell->lookup(cleanWordForLookup(word), yams::symspell::Verbosity::Top,2); const auto& s : suggestion) {
         if (s.distance == 0) return word;
         replacement = s.term;
         std::cout << "Replaced " << word << " with " << replacement << " | Distance: " << s.distance << std::endl;
@@ -283,24 +315,22 @@ struct ScoredCandidate {
 
 std::string TextRecognitionPipeline::replaceWithContext(const std::string &previousWord, const std::string &currentWord) const {
     if (isNotAlphanumeric(currentWord) or isNumber(currentWord)
-        or containsPunctuationAtStartOrEnd(currentWord) or isEqOrShorterThan(currentWord, 1)
+        or containsPunctuationAtStartOrEnd(currentWord) or isEqOrShorterThan(currentWord, 2)
         or std::isupper(currentWord[0])) return currentWord;
 
     const auto exactMatch = this->symspell->lookup(currentWord, yams::symspell::Verbosity::Top, 0);
+    if (!exactMatch.empty()) return currentWord;
 
-    if (!exactMatch.empty()) {
-        return currentWord;
-    }
-
-    const auto unigramCandidates = this->symspell->lookup(currentWord, yams::symspell::Verbosity::All, 1);
-
+    const auto unigramCandidates = this->symspell->lookup(currentWord, yams::symspell::Verbosity::All, 2);
     if (unigramCandidates.empty()) return currentWord;
 
     const long long N = this->totalUnigramCount > 0 ? this->totalUnigramCount : 1000000;
 
+    std::string prevClean = cleanWordForLookup(previousWord);
+
     long long previousUnigramCount = 0;
-    if (!previousWord.empty()) {
-        const auto suggestion = this->symspell->lookup(previousWord, yams::symspell::Verbosity::Top, 0);
+    if (!prevClean.empty()) {
+        const auto suggestion = this->symspell->lookup(prevClean, yams::symspell::Verbosity::Top, 0);
         previousUnigramCount = suggestion.empty() ? 0 : suggestion[0].frequency;
     }
 
@@ -308,17 +338,19 @@ std::string TextRecognitionPipeline::replaceWithContext(const std::string &previ
 
     for (const auto& candidate : unigramCandidates) {
         constexpr double lambda = 0.8;
-        const long long candidateWordCount = candidate.frequency; // C(w_i)
-        long long bigramCount = 0;                                // C(w_{i-1}w_i)
-        const double pUnigram = static_cast<double>(candidateWordCount) / static_cast<double>(N);
 
-        if (!previousWord.empty()) {
-            const auto suggestion = this->biSymspell->lookup(previousWord + " " + currentWord, yams::symspell::Verbosity::Top, 0);
-            bigramCount = suggestion.empty() ? 0 : suggestion[0].frequency;
-        }
+        // unigram Probability
+        const double pUnigram = static_cast<double>(candidate.frequency) / static_cast<double>(N);
 
+        // bigram Probability
         double pBigram = 0.0;
         if (previousUnigramCount > 0) {
+            std::string bigramKey = prevClean + " " + candidate.term;
+
+            const auto suggestion = this->biSymspell->lookup(bigramKey, yams::symspell::Verbosity::Top, 0);
+
+            long long bigramCount = suggestion.empty() ? 0 : suggestion[0].frequency;
+
             pBigram = static_cast<double>(bigramCount) / static_cast<double>(previousUnigramCount);
         }
 
@@ -330,11 +362,6 @@ std::string TextRecognitionPipeline::replaceWithContext(const std::string &previ
     std::ranges::sort(candidates, [](const ScoredCandidate &candidate1, const ScoredCandidate &candidate2) {
         return candidate1.probability > candidate2.probability;
     });
-
-    if (!candidates.empty() && candidates.front().term != currentWord) {
-            std::cout << "Context Corrected: " << currentWord << " -> " << candidates.front().term << " | Probability: " << candidates.front().probability << " (Prev: " << previousWord << ")" << std::endl;
-    }
-
     return candidates.empty() ? currentWord : candidates.front().term;
 }
 

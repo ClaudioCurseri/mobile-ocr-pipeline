@@ -16,9 +16,6 @@ int main() {
     if (textRecognition->initUnigramDictionary("./assets/frequency_dictionary_en_82_765.txt")) {
         std::cerr << "Could not initialize unigram dictionary." << std::endl;
     }
-    if (textRecognition->initUnigramDictionary("./assets/most-common-latin-words.txt")) {
-        std::cerr << "Could not initialize unigram dictionary." << std::endl;
-    }
     if (textRecognition->initBigramDictionary("./assets/frequency_bigramdictionary_en_243_342.txt")) {
         std::cerr << "Could not initialize bigram dictionary." << std::endl;
     }
@@ -61,7 +58,7 @@ int main() {
                 true
             };
             auto postprocessingConfig = TextRecognitionPipeline::PostprocessingConfig{
-                true,
+                false,
                 false
             };
             // run the pipeline
