@@ -1,5 +1,6 @@
 #include "text_recognition_pipeline.h"
 #include <syslog.h>
+#include <regex>
 
 TextRecognitionPipeline::~TextRecognitionPipeline() {
     this->api->End();
@@ -262,8 +263,9 @@ void TextRecognitionPipeline::postprocessingStep(PostprocessingConfig config) {
             } else {
                 continue;
             }
-            if (config.useTopResultFromDictionary) word = replaceWithTopResult(word);
-            if (config.useContext) word = replaceWithContext(previousWord, word);
+            const auto confidence = this->tesseractRecognitionResult->Confidence(level);
+            if (config.useTopResultFromDictionary) word = replaceWithTopResult(word, confidence);
+            if (config.useContext) word = replaceWithContext(previousWord, word, confidence);
             int x1, y1, x2, y2;
             this->tesseractRecognitionResult->BoundingBox(level, &x1, &y1, &x2, &y2);
             bool is_eol = this->tesseractRecognitionResult->IsAtFinalElement(tesseract::RIL_TEXTLINE, level);
@@ -282,16 +284,8 @@ std::vector<std::tuple<int, int, int, int, std::string, bool>> TextRecognitionPi
     return this->recognitionResult;
 }
 
-bool isNotAlphanumeric(const std::string &word) {
-    return std::ranges::none_of(word, isalnum);
-}
-
 bool isNumber(const std::string &word) {
     return std::ranges::any_of(word, isdigit);
-}
-
-bool isEqOrShorterThan(const std::string &word, int maxLen) {
-    return word.length() <= maxLen;
 }
 
 std::string cleanWordForLookup(std::string text) {
@@ -303,86 +297,198 @@ std::string cleanWordForLookup(std::string text) {
     return text;
 }
 
-bool containsPunctuationAtStartOrEnd(const std::string &word) {
-    return word.starts_with("(") or word.ends_with(")")
-    or word.ends_with(".") or word.ends_with("!") or word.ends_with("?")
-    or word.ends_with(",") or word.ends_with(";") or word.ends_with(":");
+// helper struct to separate word from leading and trailing punctuation
+struct TokenParts {
+    std::string prefix;
+    std::string word;
+    std::string suffix;
+};
+
+// returns the word as a TokenParts struct 
+TokenParts extractParts(const std::string& text) {
+    // regex: (non-alnum prefix) (alnum word) (non-alnum suffix)
+    const std::regex re(R"(^([^a-zA-Z0-9]*)([a-zA-Z0-9]+)([^a-zA-Z0-9]*)$)");
+    if (std::smatch match; std::regex_search(text, match, re)) {
+        return {match[1].str(), match[2].str(), match[3].str()};
+    }
+    return {"", text, ""}; 
+}
+
+// detects case and applies it to the replacement
+std::string matchCase(const std::string& original, std::string replacement) {
+    if (original.empty()) return replacement;
+
+    const bool isAllUpper = std::ranges::all_of(original, [](unsigned char c){ return std::isupper(c) || !std::isalpha(c); });
+    const bool isFirstUpper = std::isupper(original[0]);
+
+    if (isAllUpper) {
+        std::ranges::transform(replacement, replacement.begin(), toupper);
+    } else if (isFirstUpper) {
+        if (!replacement.empty()) replacement[0] = std::toupper(replacement[0]);
+    }
+    return replacement;
 }
 
 // replaces every word with the top result from the assets ONLY IF the following conditions are met:
-// - the word is alphanumeric
-// - the word is not a number
-// - the word does not contain punctuation symbols at the start or more importantly at the end
+// - the word has a confidence lower than 80
+// - the word is not a number or empty
 // - the word is longer than a given value
-// - the word is capitalized
-std::string TextRecognitionPipeline::replaceWithTopResult(const std::string &word) const {
-    if (isNotAlphanumeric(word) or isNumber(word)
-         or isEqOrShorterThan(word, 2)
-        or std::isupper(word[0])) return word;
-    std::string replacement = word;
-    for (const auto suggestion = this->symspell->lookup(cleanWordForLookup(word), yams::symspell::Verbosity::Top,2); const auto& s : suggestion) {
-        if (s.distance == 0) return word;
-        replacement = s.term;
-        std::cout << "Replaced " << word << " with " << replacement << " | Distance: " << s.distance << std::endl;
+std::string TextRecognitionPipeline::replaceWithTopResult(const std::string &word, float confidence) const {
+    // only replace words with lower confidence
+    if (confidence > 80.0f) {
+        return word;
     }
-    return replacement;
+
+    TokenParts parts = extractParts(word);
+
+    // skip numbers or very short tokens
+    if (parts.word.empty() || isNumber(parts.word) || parts.word.length() < 3) {
+        return word;
+    }
+
+    // transform search key to lowercase
+    std::string searchKey = parts.word;
+    std::ranges::transform(searchKey, searchKey.begin(), [](const unsigned char c){ return std::tolower(c); });
+
+    // edit distance based on word length
+    // short words (< 5 chars) -> max distance 1
+    // long words (>= 5 chars) -> max distance 2
+    int maxDist = parts.word.length() < 5 ? 1 : 2;
+
+    auto suggestions = this->symspell->lookup(searchKey, yams::symspell::Verbosity::All, maxDist);
+
+    if (suggestions.empty()) {
+        return word;
+    }
+
+    // sort by edit distance, then by frequency
+    std::ranges::sort(suggestions, [](const auto& a, const auto& b) {
+        if (a.distance != b.distance) {
+            return a.distance < b.distance;
+        }
+        return a.frequency > b.frequency;
+    });
+
+    const auto& bestMatch = suggestions[0];
+
+    // reject match with high edit distance and reasonable confidence to avoid falsely correcting OOV words
+    if (bestMatch.distance >= 2 && confidence > 50.0f) {
+        return word;
+    }
+
+    // return result
+    if (bestMatch.distance == 0) {
+        return word;
+    }
+
+    std::string correctedWord = matchCase(parts.word, bestMatch.term);
+    std::string finalResult = parts.prefix + correctedWord + parts.suffix;
+
+    if (finalResult != word) {
+        std::cout << "Replaced " << word << " with " << finalResult
+                  << " (Conf: " << confidence << ", Dist: " << bestMatch.distance << ")" << std::endl;
+    }
+
+    return finalResult;
 }
 
 struct ScoredCandidate {
     std::string term;
     double probability;
+    int distance;
 };
 
-std::string TextRecognitionPipeline::replaceWithContext(const std::string &previousWord, const std::string &currentWord) const {
-    if (isNotAlphanumeric(currentWord) or isNumber(currentWord)
-        or containsPunctuationAtStartOrEnd(currentWord) or isEqOrShorterThan(currentWord, 2)
-        or std::isupper(currentWord[0])) return currentWord;
+std::string TextRecognitionPipeline::replaceWithContext(const std::string &previousWord, const std::string &currentWord, float confidence) const {
+    // only replace words with lower confidence
+    if (confidence > 80.0f) {
+        return currentWord;
+    }
 
-    const auto exactMatch = this->symspell->lookup(currentWord, yams::symspell::Verbosity::Top, 0);
-    if (!exactMatch.empty()) return currentWord;
+    TokenParts parts = extractParts(currentWord);
 
-    const auto unigramCandidates = this->symspell->lookup(currentWord, yams::symspell::Verbosity::All, 2);
+    // skip numbers or very short tokens
+    if (parts.word.empty() || isNumber(parts.word) || parts.word.length() < 3) {
+        return currentWord;
+    }
+
+    // transform search key to lowercase
+    std::string currentLowercase = parts.word;
+    std::ranges::transform(currentLowercase, currentLowercase.begin(), [](const unsigned char c){ return std::tolower(c); });
+
+    // edit distance based on word length
+    // short words (< 5 chars) -> max distance 1
+    // long words (>= 5 chars) -> max distance 2
+    int maxDist = currentLowercase.length() < 5 ? 1 : 2;
+
+    // return exact match
+    if (const auto exactMatch = this->symspell->lookup(currentLowercase, yams::symspell::Verbosity::Top, 0); !exactMatch.empty()) return currentWord;
+
+    // get all unigrams within max edit distance
+    const auto unigramCandidates = this->symspell->lookup(currentLowercase, yams::symspell::Verbosity::All, maxDist);
     if (unigramCandidates.empty()) return currentWord;
 
-    const long long N = this->totalUnigramCount > 0 ? this->totalUnigramCount : 1000000;
-
-    std::string prevClean = cleanWordForLookup(previousWord);
-
+    // get all unigrams of the previous word
+    std::string cleanPrev = cleanWordForLookup(previousWord);
     long long previousUnigramCount = 0;
-    if (!prevClean.empty()) {
-        const auto suggestion = this->symspell->lookup(prevClean, yams::symspell::Verbosity::Top, 0);
+    if (!cleanPrev.empty()) {
+        const auto suggestion = this->symspell->lookup(cleanPrev, yams::symspell::Verbosity::Top, 0);
         previousUnigramCount = suggestion.empty() ? 0 : suggestion[0].frequency;
     }
 
+    // set count of all previous unigrams, fixed value as a fallback
+    const long long N = this->totalUnigramCount > 0 ? this->totalUnigramCount : 1000000;
+
     std::vector<ScoredCandidate> candidates;
 
+    // scoring
     for (const auto& candidate : unigramCandidates) {
-        constexpr double lambda = 0.8;
-
-        // unigram Probability
+        constexpr double lambda = 0.7;
+        // unigram probability
         const double pUnigram = static_cast<double>(candidate.frequency) / static_cast<double>(N);
 
-        // bigram Probability
+        // bigram probability
         double pBigram = 0.0;
         if (previousUnigramCount > 0) {
-            std::string bigramKey = prevClean + " " + candidate.term;
-
+            std::string bigramKey = cleanPrev + " " + candidate.term;
             const auto suggestion = this->biSymspell->lookup(bigramKey, yams::symspell::Verbosity::Top, 0);
-
             long long bigramCount = suggestion.empty() ? 0 : suggestion[0].frequency;
 
-            pBigram = static_cast<double>(bigramCount) / static_cast<double>(previousUnigramCount);
+            // additive smoothing to prevent zero-probability
+            pBigram = static_cast<double>(bigramCount + 1) / static_cast<double>(previousUnigramCount + N);
+        } else {
+             pBigram = pUnigram;
         }
 
         // Jelinek-Mercer Smoothing
-        const double probability = lambda * pBigram + (1 - lambda) * pUnigram;
+        double probability = lambda * pBigram + (1.0 - lambda) * pUnigram;
 
-        candidates.push_back(ScoredCandidate{candidate.term, probability});
+        // divide score by 100 per every edit distance -> prefer words with lower edit distance
+        double finalScore = probability / std::pow(100.0, candidate.distance);
+
+        candidates.push_back(ScoredCandidate{candidate.term, finalScore, candidate.distance});
     }
-    std::ranges::sort(candidates, [](const ScoredCandidate &candidate1, const ScoredCandidate &candidate2) {
-        return candidate1.probability > candidate2.probability;
+
+    std::ranges::sort(candidates, [](const ScoredCandidate &a, const ScoredCandidate &b) {
+        return a.probability > b.probability;
     });
-    return candidates.empty() ? currentWord : candidates.front().term;
+
+    if (candidates.empty()) return currentWord;
+    const auto& bestCandidate = candidates.front();
+
+    // reject match with high edit distance and reasonable confidence to avoid falsely correcting OOV words
+    if (bestCandidate.distance >= 2 && confidence > 50.0f) {
+        return currentWord;
+    }
+
+    // return result
+    std::string correctedWord = matchCase(parts.word, bestCandidate.term);
+    auto finalResult = parts.prefix + correctedWord + parts.suffix;
+
+    std::cout << "Replaced " << currentWord << " with " << finalResult
+                  << " | Conf: " << confidence
+                  << " | Context: [" << cleanPrev << "]" << std::endl;
+
+    return finalResult;
 }
 
 // --------------------- C adapter methods ---------------------

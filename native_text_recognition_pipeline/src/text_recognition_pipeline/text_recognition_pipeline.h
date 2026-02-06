@@ -55,8 +55,8 @@ private:
     void resizeImage();
     void dewarpImage();
     // postprocessing
-    std::string replaceWithTopResult(const std::string &word) const;
-    std::string replaceWithContext(const std::string &previousWord, const std::string &currentWord) const;
+    std::string replaceWithTopResult(const std::string &word, float confidence) const;
+    std::string replaceWithContext(const std::string &previousWord, const std::string &currentWord, float confidence) const;
 };
 
 #else
