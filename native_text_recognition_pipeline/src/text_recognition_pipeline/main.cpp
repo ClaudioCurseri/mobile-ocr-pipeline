@@ -1,7 +1,58 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <vector>
+#include <future>
+#include <mutex>
 #include "text_recognition_pipeline.h"
+
+std::mutex log_mutex;
+
+struct Job {
+    std::filesystem::path inputPath;
+    std::filesystem::path outputPath;
+};
+
+void processBatch(const std::vector<Job>& jobs, const int threadId) {
+    auto* textRecognition = new TextRecognitionPipeline();
+
+    textRecognition->initUnigramDictionary("./assets/frequency_dictionary_en_82_765.txt");
+    textRecognition->initBigramDictionary("./assets/frequency_bigramdictionary_en_243_342.txt");
+
+    textRecognition->initTesseract("./assets/tessdata/");
+
+    constexpr auto preprocessingConfig = TextRecognitionPipeline::PreprocessingConfig{
+        true, true, true, true, true
+    };
+    constexpr auto postprocessingConfig = TextRecognitionPipeline::PostprocessingConfig{
+        false, false
+    };
+
+    int count = 0;
+    for (const auto& job : jobs) {
+        textRecognition->setImage(job.inputPath.string().c_str());
+        textRecognition->preprocessingStep(preprocessingConfig);
+        textRecognition->textRecognitionStep();
+        textRecognition->postprocessingStep(postprocessingConfig);
+
+        auto finalResult = textRecognition->getRecognitionResult();
+
+        if (std::ofstream outFile(job.outputPath); outFile.is_open()) {
+            for (const auto& s : finalResult) {
+                outFile << std::get<4>(s);
+                if (std::get<5>(s)) outFile << "\n";
+                else outFile << " ";
+            }
+        }
+
+        count++;
+        if (count % 50 == 0) {
+            std::lock_guard lock(log_mutex);
+            std::cout << "[Thread " << threadId << "] Processed " << count << " images." << std::endl;
+        }
+    }
+    delete textRecognition;
+}
 
 /**
  * The main entry point of the text recognition pipeline.
@@ -10,86 +61,48 @@
  * @return Whether the execution was successful.
  */
 int main() {
-    // initialize text recognition pipeline
-    auto *textRecognition = new TextRecognitionPipeline();
-    // initialize dictionaries
-    if (textRecognition->initUnigramDictionary("./assets/frequency_dictionary_en_82_765.txt")) {
-        std::cerr << "Could not initialize unigram dictionary." << std::endl;
-    }
-    if (textRecognition->initBigramDictionary("./assets/frequency_bigramdictionary_en_243_342.txt")) {
-        std::cerr << "Could not initialize bigram dictionary." << std::endl;
-    }
+    setenv("OMP_THREAD_LIMIT", "1", 1);
+
     const std::filesystem::path inputDir = "./../../../evaluation/testDataset/input_test/";
     const std::filesystem::path outputDir = "./../../../evaluation/testDataset/output_test/";
-    // ensure input directory exists
+
     if (!std::filesystem::exists(inputDir)) {
-        std::cerr << "Error: Input directory not found at " << std::filesystem::absolute(inputDir) << std::endl;
+        std::cerr << "Input directory not found." << std::endl;
         return 1;
     }
-    // ensure output directory exists
-    if (!std::filesystem::exists(outputDir)) {
-        std::filesystem::create_directories(outputDir);
-    }
-    std::cout << "Running the pipeline..." << std::endl;
-    long imageNum = 1;
+    std::filesystem::create_directories(outputDir);
+
+    std::vector<Job> allJobs;
+
     for (const auto& entry : std::filesystem::directory_iterator(inputDir)) {
         if (entry.path().extension() == ".jpg") {
-            // construct input filepath
-            std::ostringstream filenameStream;
-            filenameStream << std::setw(5) << std::setfill('0') << imageNum << ".jpg";
-            std::string filename = filenameStream.str();
-            std::filesystem::path inputPath = inputDir / filename;
-
-            // construct output filepath
-            std::filesystem::path outputFilename = std::filesystem::path(filename).replace_extension(".txt");
-            std::filesystem::path outputPath = outputDir / outputFilename;
-
-            // ensure input file exists
-            if (!std::filesystem::exists(inputPath)) {
-                std::cerr << "File " << filename << " does not exist. Skipping." << std::endl;
-                continue;
-            }
-            // pipeline configuration
-            auto preprocessingConfig = TextRecognitionPipeline::PreprocessingConfig{
-                true,
-                true,
-                true,
-                true,
-                true
-            };
-            auto postprocessingConfig = TextRecognitionPipeline::PostprocessingConfig{
-                false,
-                false
-            };
-            // run the pipeline
-            textRecognition->initTesseract("./assets/tessdata/");
-            textRecognition->setImage(inputPath.string().c_str());
-            textRecognition->preprocessingStep(preprocessingConfig);
-            textRecognition->textRecognitionStep();
-            textRecognition->postprocessingStep(postprocessingConfig);
-            auto finalResult = textRecognition->getRecognitionResult();
-            // save results
-            if (std::ofstream outFile(outputPath); outFile.is_open()) {
-                for (const auto& s : finalResult) {
-                    // the current word
-                    outFile << std::get<4>(s);
-                    // ensure correct output format
-                    if (std::get<5>(s)) {
-                        outFile << "\n";
-                    } else {
-                        outFile << " ";
-                    }
-                }
-                outFile.close();
-                std::cout << "  > Saved result to: " << outputFilename << std::endl;
-            } else {
-                std::cerr << "Error: Could not write to " << outputPath << std::endl;
-            }
-            imageNum += 1;
+            std::string stem = entry.path().stem().string();
+            std::filesystem::path outputFilename = stem + ".txt";
+            allJobs.push_back({entry.path(), outputDir / outputFilename});
         }
     }
-    // free memory
-    delete textRecognition;
+
+    unsigned int maxThreads = std::thread::hardware_concurrency();
+    unsigned int numThreads = maxThreads > 2 ? maxThreads - 2 : 1;
+
+    std::cout << "Found " << allJobs.size() << " images. Processing with " << numThreads << " threads..." << std::endl;
+
+    std::vector<std::vector<Job>> chunks(numThreads);
+    for (size_t i = 0; i < allJobs.size(); ++i) {
+        chunks[i % numThreads].push_back(allJobs[i]);
+    }
+
+    std::vector<std::future<void>> futures;
+    for (unsigned int i = 0; i < numThreads; ++i) {
+        if (!chunks[i].empty()) {
+            futures.push_back(std::async(std::launch::async, processBatch, chunks[i], i));
+        }
+    }
+
+    for (auto& f : futures) {
+        f.get();
+    }
+
     std::cout << "Done." << std::endl;
     return 0;
 }
