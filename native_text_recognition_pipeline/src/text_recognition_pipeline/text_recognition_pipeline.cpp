@@ -35,8 +35,22 @@ void TextRecognitionPipeline::convertToBinaryImage() {
     if (this->internalImage.channels() > 1) {
         cv::cvtColor(this->internalImage, this->internalImage, cv::COLOR_RGB2GRAY);
     }
-    cv::adaptiveThreshold(this->internalImage, this->internalImage, 255, cv::ADAPTIVE_THRESH_MEAN_C, cv::THRESH_BINARY, 9, 5);
-    cv::medianBlur(this->internalImage, this->internalImage, 5);
+    // illumination correction
+    cv::Mat background;
+    const cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(25, 25));
+    cv::morphologyEx(this->internalImage, background, cv::MORPH_CLOSE, kernel);
+    cv::divide(this->internalImage, background, this->internalImage, 255, -1);
+
+    // denoising
+    cv::GaussianBlur(this->internalImage, this->internalImage, cv::Size(3, 3), 0);
+
+    // adaptive thresholding
+    cv::adaptiveThreshold(this->internalImage, this->internalImage,
+                          255,
+                          cv::ADAPTIVE_THRESH_GAUSSIAN_C,
+                          cv::THRESH_BINARY,
+                          31,
+                          10);
 }
 
 void TextRecognitionPipeline::unsharpMasking() {
@@ -76,14 +90,20 @@ void TextRecognitionPipeline::dewarpImage() {
     cv::Mat gray;
     cv::cvtColor(this->image, gray, cv::COLOR_RGB2GRAY);
 
+    // denoising
     cv::GaussianBlur(gray, gray, cv::Size(5, 5), 0);
+
+    // apply morphological gradient to increase the chance of finding edges
+    cv::Mat grad;
+    cv::Mat morphKernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3));
+    cv::morphologyEx(gray, grad, cv::MORPH_GRADIENT, morphKernel);
 
     // edge detection
     cv::Mat edged;
-    cv::Canny(gray, edged, 75, 200);
+    cv::Canny(grad, edged, 75, 200);
 
     // edge detection was too strict and made the picture mostly black?
-    // -> then try again with lower thresholds
+    // -> then try again with lower thresholds and the original grayscale image without morphological gradient
     if (cv::countNonZero(edged) < 200000) {
         cv::Canny(gray, edged, 30, 100);
     }
