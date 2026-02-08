@@ -8,18 +8,18 @@ TextRecognitionPipeline::~TextRecognitionPipeline() {
 
 
 void TextRecognitionPipeline::preprocessingStep(const PreprocessingConfig config) {
-    if (config.grayscale) convertToGrayscale();
-    if (config.dewarp) dewarpImage();
-    if (config.unsharpMasking) unsharpMasking();
-    if (config.binary) convertToBinaryImage();
-    if (config.resize) resizeImage();
+    if (config.grayscale) this->convertToGrayscale();
+    if (config.dewarp) this->dewarpImage();
+    if (config.unsharpMasking) this->unsharpMasking();
+    if (config.binary) this->convertToBinaryImage();
+    if (config.resize) this->resizeImage();
     this->image = this->internalImage.clone();
     this->api->SetImage(this->internalImage.data, this->internalImage.cols, this->internalImage.rows, this->internalImage.channels(), this->internalImage.step);
 }
 
 void TextRecognitionPipeline::setImage(const char* imagePath) {
     const auto image = cv::imread(imagePath, cv::IMREAD_COLOR);
-    this->image = image;
+    if (this->image.cols != 3096 && this->image.rows != 4128) cv::resize(image, this->image, cv::Size(3096, 4128));
     this->internalImage = this->image.clone();
     this->api->SetImage(image.data, image.cols, image.rows, image.channels(), image.step);
 }
