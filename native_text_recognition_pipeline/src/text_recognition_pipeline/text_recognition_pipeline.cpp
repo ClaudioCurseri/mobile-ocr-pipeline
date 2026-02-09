@@ -92,26 +92,21 @@ void TextRecognitionPipeline::dewarpImage() {
     cv::cvtColor(this->image, gray, cv::COLOR_RGB2GRAY);
 
     // denoising
-    cv::GaussianBlur(gray, gray, cv::Size(5, 5), 0);
-
-    // apply morphological gradient to increase the chance of finding edges
-    cv::Mat grad;
-    cv::Mat morphKernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3));
-    cv::morphologyEx(gray, grad, cv::MORPH_GRADIENT, morphKernel);
+    cv::GaussianBlur(gray, gray, cv::Size(7, 7), 0);
 
     // edge detection
     cv::Mat edged;
-    cv::Canny(grad, edged, 75, 200);
+    cv::Canny(gray, edged, 75, 200);
 
     // edge detection was too strict and made the picture mostly black?
-    // -> then try again with lower thresholds and the original grayscale image without morphological gradient
+    // -> then try again with lower thresholds and the original grayscale image
     if (cv::countNonZero(edged) < 200000) {
-        cv::Canny(gray, edged, 30, 100);
+        cv::Canny(gray, edged, 25, 75);
     }
 
     // dilation -> all structures grow, increases chance of finding the document contours
     cv::Mat dilated;
-    cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(11, 11));
+    cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(5, 7));
     cv::dilate(edged, dilated, kernel, cv::Point(-1, -1), 1);
     // find all contours
     std::vector<std::vector<cv::Point>> contours;
@@ -139,7 +134,7 @@ void TextRecognitionPipeline::dewarpImage() {
         double perimeter = cv::arcLength(contour, true);
         std::vector<cv::Point> approx;
         // try to find four contours
-        for (double epsilon = 0.02; epsilon <= 0.05; epsilon += 0.01) {
+        for (double epsilon = 0.01; epsilon <= 0.05; epsilon += 0.01) {
             cv::approxPolyDP(contour, approx, epsilon * perimeter, true);
 
             if (approx.size() == 4) {
@@ -147,15 +142,6 @@ void TextRecognitionPipeline::dewarpImage() {
                     found = true;
                     goto end_search;
             }
-        }
-        // did not find four contours? -> try to use the min rect within the given points
-        if (area > imageArea * 0.2) {
-            cv::RotatedRect rect = cv::minAreaRect(contour);
-            cv::Point2f pts[4];
-            rect.points(pts);
-            for (auto pt : pts) documentContour.push_back(pt);
-            found = true;
-            goto end_search;
         }
     }
 end_search:
