@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:camera/camera.dart';
+import 'package:scan_local/pages/scan/scan_from_files_page.dart';
 import 'package:scan_local/service/pipeline/text_recognition_pipeline.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
@@ -7,6 +8,8 @@ import 'package:path/path.dart' as path;
 import 'package:flutter_pdfview/flutter_pdfview.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:image_picker/image_picker.dart';
 
 import 'package:scan_local/pages/scan/scan_page.dart';
 import 'package:scan_local/pages/settings/settings_page.dart';
@@ -15,7 +18,11 @@ class HomePage extends StatefulWidget {
   final CameraDescription camera;
   final TextRecognitionPipeline textRecognitionPipeline;
 
-  const HomePage({super.key, required this.camera, required this.textRecognitionPipeline});
+  const HomePage({
+    super.key,
+    required this.camera,
+    required this.textRecognitionPipeline,
+  });
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -37,8 +44,7 @@ class _HomePageState extends State<HomePage> {
     if (!directory.existsSync()) return;
     final cameraDirectory = Directory('${directory.path}/camera/pictures');
     if (!cameraDirectory.existsSync()) return;
-    cameraDirectory.listSync()
-      .forEach((file) => file.deleteSync());
+    cameraDirectory.listSync().forEach((file) => file.deleteSync());
   }
 
   Future<void> _loadPdfFiles({bool showFullLoading = true}) async {
@@ -80,9 +86,12 @@ class _HomePageState extends State<HomePage> {
         await file.delete();
         await _loadPdfFiles(showFullLoading: false);
         if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text("File deleted"), duration: Duration(milliseconds: 500)));
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("File deleted"),
+              duration: Duration(milliseconds: 500),
+            ),
+          );
         }
       }
     } catch (e) {
@@ -146,11 +155,32 @@ class _HomePageState extends State<HomePage> {
   void _navigateToScanPage() {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => ScanPage(camera: widget.camera, textRecognitionPipeline: widget.textRecognitionPipeline)),
+      MaterialPageRoute(
+        builder: (context) => ScanPage(
+          camera: widget.camera,
+          textRecognitionPipeline: widget.textRecognitionPipeline,
+        ),
+      ),
     ).then((success) async {
       if (success == true) {
         await _loadPdfFiles(showFullLoading: false);
         await _clearTempCameraPictures();
+      }
+    });
+  }
+
+  void _navigateToScanFromFilesPage(List<XFile> files) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ScanFromFilesPage(
+          textRecognitionPipeline: widget.textRecognitionPipeline,
+          files: files,
+        ),
+      ),
+    ).then((success) async {
+      if (success == true) {
+        await _loadPdfFiles(showFullLoading: false);
       }
     });
   }
@@ -188,114 +218,120 @@ class _HomePageState extends State<HomePage> {
                 : RefreshIndicator(
                     onRefresh: () => _loadPdfFiles(showFullLoading: false),
                     child: _pdfFiles.isEmpty
-                    ? LayoutBuilder(
-                        builder: (context, constraints) => SingleChildScrollView(
-                          physics: const AlwaysScrollableScrollPhysics(),
-                          child: SizedBox(
-                            height: constraints.maxHeight,
-                            child: Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.document_scanner,
-                                    color: Theme.of(context).colorScheme.primary,
-                                    size: 75,
+                        ? LayoutBuilder(
+                            builder: (context, constraints) =>
+                                SingleChildScrollView(
+                                  physics:
+                                      const AlwaysScrollableScrollPhysics(),
+                                  child: SizedBox(
+                                    height: constraints.maxHeight,
+                                    child: Center(
+                                      child: Column(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Icon(
+                                            Icons.document_scanner,
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.primary,
+                                            size: 75,
+                                          ),
+                                          const SizedBox(height: 15),
+                                          const Text(
+                                            "Scan documents to view them here.",
+                                            textAlign: TextAlign.center,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
                                   ),
-                                  const SizedBox(height: 15),
-                                  const Text(
-                                    "Scan documents to view them here.",
-                                    textAlign: TextAlign.center,
+                                ),
+                          )
+                        : ListView.builder(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            itemCount: _pdfFiles.length,
+                            itemBuilder: (context, index) {
+                              final file = _pdfFiles[index];
+                              final fileName = path.basename(file.path);
+                              final lastModified = file.statSync().modified;
+
+                              return Slidable(
+                                key: ValueKey(file.path),
+
+                                startActionPane: ActionPane(
+                                  motion: const ScrollMotion(),
+                                  children: [
+                                    SlidableAction(
+                                      onPressed: (context) => _deleteFile(file),
+                                      backgroundColor: Theme.of(
+                                        context,
+                                      ).colorScheme.error,
+                                      foregroundColor: Theme.of(
+                                        context,
+                                      ).colorScheme.onError,
+                                      icon: Icons.delete,
+                                      label: 'Delete',
+                                    ),
+                                    SlidableAction(
+                                      onPressed: (context) => _renameFile(file),
+                                      backgroundColor: Theme.of(
+                                        context,
+                                      ).colorScheme.secondary,
+                                      foregroundColor: Theme.of(
+                                        context,
+                                      ).colorScheme.onSecondary,
+                                      icon: Icons.edit,
+                                      label: 'Rename',
+                                    ),
+                                  ],
+                                ),
+
+                                endActionPane: ActionPane(
+                                  motion: const ScrollMotion(),
+                                  children: [
+                                    SlidableAction(
+                                      onPressed: (context) =>
+                                          _shareFile(file.path),
+                                      backgroundColor: Theme.of(
+                                        context,
+                                      ).colorScheme.tertiary,
+                                      foregroundColor: Theme.of(
+                                        context,
+                                      ).colorScheme.onTertiary,
+                                      icon: Icons.share,
+                                      label: 'Share',
+                                    ),
+                                  ],
+                                ),
+
+                                child: ListTile(
+                                  leading: const Icon(
+                                    Icons.picture_as_pdf,
+                                    color: Colors.red,
                                   ),
-                                ],
-                              ),
-                            ),
+                                  title: Text(fileName),
+                                  subtitle: Text(
+                                    "Date: ${lastModified.toString().split('.')[0]}",
+                                  ),
+                                  trailing: const Icon(
+                                    Icons.arrow_forward_ios,
+                                    size: 16,
+                                  ),
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) =>
+                                            PDFViewerPage(filePath: file.path),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              );
+                            },
                           ),
-                        ),
-                      )
-                    : ListView.builder(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        itemCount: _pdfFiles.length,
-                        itemBuilder: (context, index) {
-                          final file = _pdfFiles[index];
-                          final fileName = path.basename(file.path);
-                          final lastModified = file.statSync().modified;
-
-                          return Slidable(
-                            key: ValueKey(file.path),
-
-                            startActionPane: ActionPane(
-                              motion: const ScrollMotion(),
-                              children: [
-                                SlidableAction(
-                                  onPressed: (context) => _deleteFile(file),
-                                  backgroundColor: Theme.of(
-                                    context,
-                                  ).colorScheme.error,
-                                  foregroundColor: Theme.of(
-                                    context,
-                                  ).colorScheme.onError,
-                                  icon: Icons.delete,
-                                  label: 'Delete',
-                                ),
-                                SlidableAction(
-                                  onPressed: (context) => _renameFile(file),
-                                  backgroundColor: Theme.of(
-                                    context,
-                                  ).colorScheme.secondary,
-                                  foregroundColor: Theme.of(
-                                    context,
-                                  ).colorScheme.onSecondary,
-                                  icon: Icons.edit,
-                                  label: 'Rename',
-                                ),
-                              ],
-                            ),
-
-                            endActionPane: ActionPane(
-                              motion: const ScrollMotion(),
-                              children: [
-                                SlidableAction(
-                                  onPressed: (context) => _shareFile(file.path),
-                                  backgroundColor: Theme.of(
-                                    context,
-                                  ).colorScheme.tertiary,
-                                  foregroundColor: Theme.of(
-                                    context,
-                                  ).colorScheme.onTertiary,
-                                  icon: Icons.share,
-                                  label: 'Share',
-                                ),
-                              ],
-                            ),
-
-                            child: ListTile(
-                              leading: const Icon(
-                                Icons.picture_as_pdf,
-                                color: Colors.red,
-                              ),
-                              title: Text(fileName),
-                              subtitle: Text(
-                                "Date: ${lastModified.toString().split('.')[0]}",
-                              ),
-                              trailing: const Icon(
-                                Icons.arrow_forward_ios,
-                                size: 16,
-                              ),
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) =>
-                                        PDFViewerPage(filePath: file.path),
-                                  ),
-                                );
-                              },
-                            ),
-                          );
-                        },
-                      ),
-            ),
+                  ),
           ),
         ],
       ),
@@ -312,10 +348,35 @@ class _HomePageState extends State<HomePage> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             IconButton(
-              onPressed: () {},
-              icon: const Icon(Icons.folder_rounded),
+              onPressed: () async {
+                FilePickerResult? result = await FilePicker.platform.pickFiles(
+                  allowedExtensions: ['jpg', 'jpeg', 'png', 'tiff', 'tif'],
+                  type: FileType.custom,
+                  allowMultiple: true,
+                );
+
+                if (result == null) {
+                  // user canceled file picker
+                  return;
+                }
+
+                List<XFile> files = result.xFiles;
+                if (files.isEmpty) return;
+
+                _navigateToScanFromFilesPage(files);
+              },
+              icon: const Icon(Icons.upload_file_rounded),
             ),
-            IconButton(onPressed: () {}, icon: const Icon(Icons.photo_rounded)),
+            IconButton(
+              onPressed: () async {
+                final ImagePicker picker = ImagePicker();
+                final List<XFile> images = await picker.pickMultiImage();
+                if (images.isEmpty) return;
+
+                _navigateToScanFromFilesPage(images);
+              },
+              icon: const Icon(Icons.photo_rounded),
+            ),
           ],
         ),
       ),

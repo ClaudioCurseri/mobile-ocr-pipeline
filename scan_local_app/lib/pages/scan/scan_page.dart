@@ -4,6 +4,7 @@ import 'package:camera/camera.dart';
 import 'package:scan_local/pages/settings/settings_page.dart';
 import 'package:scan_local/service/pipeline/text_recognition_pipeline.dart';
 import 'package:flutter/material.dart';
+import 'package:scan_local/widgets/buttons.dart';
 import 'package:text_recognition_pipeline/native_text_recognition_pipeline.dart';
 import 'package:scan_local/util/utils.dart' as utils;
 
@@ -244,65 +245,12 @@ class _ScanPageState extends State<ScanPage> {
     );
   }
 
-  Widget _buildReviewBtn({
-    required Icon icon,
-    required VoidCallback onPressed,
-    required String text,
-  }) {
-    return OutlinedButton.icon(
-      style: TextButton.styleFrom(
-        iconSize: 30,
-        side: BorderSide(
-          width: 1,
-          color: Theme.of(context).colorScheme.primary,
-        ),
-      ),
-      onPressed: onPressed,
-      icon: icon,
-      label: Text(text),
-    );
-  }
-
-  Widget _buildConfigBtn({
-    required IconData icon,
-    required String text,
-    required bool config,
-    required VoidCallback onPressed,
-  }) {
-    return OutlinedButton.icon(
-      style: TextButton.styleFrom(
-        iconSize: 20,
-        side: BorderSide(
-          width: 1,
-          color: config
-              ? Theme.of(context).colorScheme.primary
-              : Theme.of(context).colorScheme.onSurfaceVariant,
-        ),
-      ),
-      onPressed: onPressed,
-      icon: Icon(
-        icon,
-        color: config
-            ? Theme.of(context).colorScheme.primary
-            : Theme.of(context).colorScheme.onSurfaceVariant,
-      ),
-      label: Text(
-        text,
-        style: TextStyle(
-          color: config
-              ? Theme.of(context).colorScheme.primary
-              : Theme.of(context).colorScheme.onSurfaceVariant,
-        ),
-      ),
-    );
-  }
-
   Widget _buildReviewControls() {
     return Row(
       key: const ValueKey('reviewState'),
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
-        _buildReviewBtn(
+        Buttons.buildReviewBtn(
           icon: const Icon(Icons.close),
           onPressed: () async {
             await utils.deleteFile(File(_capturedImage?.path ?? ""));
@@ -312,8 +260,9 @@ class _ScanPageState extends State<ScanPage> {
             });
           },
           text: 'Retry',
+          context: context
         ),
-        _buildReviewBtn(
+        Buttons.buildReviewBtn(
           icon: const Icon(Icons.check),
           onPressed: () async {
             showDialog(
@@ -345,6 +294,7 @@ class _ScanPageState extends State<ScanPage> {
             }
           },
           text: 'Scan',
+          context: context
         ),
       ],
     );
@@ -449,7 +399,7 @@ class _ScanPageState extends State<ScanPage> {
                                           runSpacing: 10,
                                           alignment: WrapAlignment.start,
                                           children: [
-                                            _buildConfigBtn(
+                                            Buttons.buildConfigBtn(
                                               icon:
                                                   Icons.filter_b_and_w_outlined,
                                               text: "Grayscale",
@@ -459,8 +409,9 @@ class _ScanPageState extends State<ScanPage> {
                                                   _grayscale = !_grayscale;
                                                 });
                                               },
+                                              context: context,
                                             ),
-                                            _buildConfigBtn(
+                                            Buttons.buildConfigBtn(
                                               icon: Icons.high_quality,
                                               text: "Unsharp Mask",
                                               config: _unsharpMasking,
@@ -470,8 +421,9 @@ class _ScanPageState extends State<ScanPage> {
                                                       !_unsharpMasking;
                                                 });
                                               },
+                                              context: context,
                                             ),
-                                            _buildConfigBtn(
+                                            Buttons.buildConfigBtn(
                                               icon: Icons.contrast,
                                               text: "Binary",
                                               config: _binary,
@@ -480,8 +432,9 @@ class _ScanPageState extends State<ScanPage> {
                                                   _binary = !_binary;
                                                 });
                                               },
+                                              context: context,
                                             ),
-                                            _buildConfigBtn(
+                                            Buttons.buildConfigBtn(
                                               icon: Icons.transform,
                                               text: "Dewarp",
                                               config: _dewarp,
@@ -490,8 +443,9 @@ class _ScanPageState extends State<ScanPage> {
                                                   _dewarp = !_dewarp;
                                                 });
                                               },
+                                              context: context,
                                             ),
-                                            _buildConfigBtn(
+                                            Buttons.buildConfigBtn(
                                               icon: Icons.aspect_ratio,
                                               text: "Resize",
                                               config: _resize,
@@ -500,6 +454,7 @@ class _ScanPageState extends State<ScanPage> {
                                                   _resize = !_resize;
                                                 });
                                               },
+                                              context: context,
                                             ),
                                           ],
                                         ),
@@ -516,7 +471,7 @@ class _ScanPageState extends State<ScanPage> {
                                           runSpacing: 10,
                                           alignment: WrapAlignment.start,
                                           children: [
-                                            _buildConfigBtn(
+                                            Buttons.buildConfigBtn(
                                               icon: Icons.spellcheck,
                                               text: "Dictionary",
                                               config:
@@ -527,8 +482,9 @@ class _ScanPageState extends State<ScanPage> {
                                                       !_useTopResultFromDictionary;
                                                 });
                                               },
+                                              context: context,
                                             ),
-                                            _buildConfigBtn(
+                                            Buttons.buildConfigBtn(
                                               icon: Icons.text_fields,
                                               text: "Context",
                                               config: _useContext,
@@ -537,6 +493,7 @@ class _ScanPageState extends State<ScanPage> {
                                                   _useContext = !_useContext;
                                                 });
                                               },
+                                              context: context,
                                             ),
                                           ],
                                         ),
