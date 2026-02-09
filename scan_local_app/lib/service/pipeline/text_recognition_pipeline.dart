@@ -29,7 +29,7 @@ class TextRecognitionPipeline {
 
   Future<bool> initBigramDictionaries() async {
     if (bigramDictionariesInitialized) return true;
-    final initializedUnigrams = await textRecognitionPipeline.initUnigramDictionaries();
+    final initializedUnigrams = unigramDictionariesInitialized ? true : await textRecognitionPipeline.initUnigramDictionaries();
     final initializedBigrams = await textRecognitionPipeline.initBigramDictionaries();
     bigramDictionariesInitialized = initializedUnigrams && initializedBigrams;
     return bigramDictionariesInitialized;

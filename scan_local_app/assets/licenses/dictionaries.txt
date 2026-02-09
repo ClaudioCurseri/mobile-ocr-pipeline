@@ -1,0 +1,24 @@
+This application uses frequency dictionaries (unigrams and bigrams) provided by the SymSpell project.
+  
+  FILES:
+  1. frequency_dictionary_en_82_765.txt
+  2. frequency_bigramdictionary_en_243_342.txt
+  
+  SOURCE ORIGIN:
+  These files are derivative works based on the "Google Books Ngram Corpus".
+  
+  ORIGINAL DATA LICENSE:
+  1. GOOGLE BOOKS NGRAM CORPUS
+  Source: http://storage.googleapis.com/books/ngrams/books/datasetsv2.html
+  License: Creative Commons Attribution 3.0 Unported (CC BY 3.0)
+  Link: https://creativecommons.org/licenses/by/3.0/
+
+  2. SCOWL (Spell Checker Oriented Word Lists)
+  Copyright: 2000-2004 by Kevin Atkinson
+  License: Permissive / MIT-like (See specific SCOWL documentation for full details)
+  Source: http://wordlist.aspell.net/
+  
+  COMPILATION & FILTERING:
+  The raw data was filtered, intersected with SCOWL (Spell Checker Oriented Word Lists), and formatted for performance by the SymSpell project.
+  
+  SymSpell Repository: https://github.com/wolfgarbe/SymSpell

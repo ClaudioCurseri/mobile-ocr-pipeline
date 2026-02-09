@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -37,7 +38,11 @@ class _SettingsPageState extends State<SettingsPage> {
             children: [
               Text(
                 "Debug Options",
-                style: TextStyle(color: Theme.of(context).colorScheme.primary, fontSize: 18, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.primary,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
@@ -47,8 +52,17 @@ class _SettingsPageState extends State<SettingsPage> {
                     mainAxisAlignment: MainAxisAlignment.start,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text("Show recognized text", style: TextStyle(fontSize: 14),),
-                      Text("Displays the recognized text on the scanned document", style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 9)),
+                      Text(
+                        "Show recognized text",
+                        style: TextStyle(fontSize: 14),
+                      ),
+                      Text(
+                        "Displays the recognized text on the scanned document",
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          fontSize: 9,
+                        ),
+                      ),
                     ],
                   ),
                   Switch(
@@ -62,6 +76,20 @@ class _SettingsPageState extends State<SettingsPage> {
                     },
                   ),
                 ],
+              ),
+              ListTile(
+                title: Text('Open Source Licenses'),
+                onTap: () async {
+                  PackageInfo packageInfo = await PackageInfo.fromPlatform();
+                  if (context.mounted) {
+                    showLicensePage(
+                      context: context,
+                      applicationName: packageInfo.appName,
+                      applicationVersion: packageInfo.version,
+                    );
+                  }
+                },
+                shape: Border(top: BorderSide(color: Theme.of(context).colorScheme.onSurfaceVariant)),
               ),
             ],
           ),
