@@ -33,7 +33,7 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
-    - assets/tessdata/eng.traineddata
+    - assets/tessdata/
     - assets/unigram/
     - assets/bigram/
     - assets/fonts/

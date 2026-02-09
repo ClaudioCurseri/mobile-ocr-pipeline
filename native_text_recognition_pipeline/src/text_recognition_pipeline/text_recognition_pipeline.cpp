@@ -192,7 +192,7 @@ end_search:
 
 void TextRecognitionPipeline::initTesseract(const char* filepath) {
     this->api = new tesseract::TessBaseAPI();
-    if (api->Init(filepath, "eng", tesseract::OEM_LSTM_ONLY)) {
+    if (api->Init(filepath, "eng+lat", tesseract::OEM_LSTM_ONLY)) {
         std::cerr << "Could not initialize tesseract." << std::endl;
         syslog(LOG_ALERT, "Could not initialize tesseract.");
         syslog(LOG_ALERT, "%s", filepath);

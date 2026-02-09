@@ -72,17 +72,21 @@ class NativeTextRecognitionPipeline {
       await tessDataFolder.create(recursive: true);
     }
 
-    final filePath = '${tessDataFolder.path}/eng.traineddata';
-    final file = File(filePath);
+    final traineddataFiles = ['eng.traineddata', 'lat.traineddata'];
 
-    if (!await file.exists()) {
-      final byteData = await rootBundle.load('assets/tessdata/eng.traineddata');
-      await file.writeAsBytes(
-        byteData.buffer.asUint8List(
-          byteData.offsetInBytes,
-          byteData.lengthInBytes,
-        ),
-      );
+    for (var traineddataFile in traineddataFiles) {
+      final filePath = '${tessDataFolder.path}/$traineddataFile';
+      final file = File(filePath);
+
+      if (!await file.exists()) {
+        final byteData = await rootBundle.load('assets/tessdata/$traineddataFile');
+        await file.writeAsBytes(
+          byteData.buffer.asUint8List(
+            byteData.offsetInBytes,
+            byteData.lengthInBytes,
+          ),
+        );
+      }
     }
 
     final cPath = tessDataFolder.path.toNativeUtf8();
