@@ -218,20 +218,24 @@ class NativeTextRecognitionPipeline {
     final results = <RecognitionResult>[];
 
     for (var i = 0; i < count; i++) {
-      final item = TextRecognition_getResultItem(textRecognitionPipeline, i);
+      try {
+        final item = TextRecognition_getResultItem(textRecognitionPipeline, i);
 
-      final word = item.word.cast<Utf8>().toDartString();
+        final word = item.word.cast<Utf8>().toDartString();
 
-      results.add(
-        RecognitionResult(
-          text: word,
-          x: item.x1,
-          y: item.y1,
-          width: item.x2 - item.x1,
-          height: item.y2 - item.y1,
-          isEndOfLine: item.is_eol,
-        ),
-      );
+        results.add(
+          RecognitionResult(
+            text: word,
+            x: item.x1,
+            y: item.y1,
+            width: item.x2 - item.x1,
+            height: item.y2 - item.y1,
+            isEndOfLine: item.is_eol,
+          ),
+        );
+      } catch (e) {
+        print("Could not get recognition result item: $e");
+      }
     }
     return results;
   }
