@@ -29,6 +29,16 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     _loadPdfFiles();
+    _clearTempCameraPictures();
+  }
+
+  Future<void> _clearTempCameraPictures() async {
+    final directory = await getApplicationDocumentsDirectory();
+    if (!directory.existsSync()) return;
+    final cameraDirectory = Directory('${directory.path}/camera/pictures');
+    if (!directory.existsSync()) return;
+    cameraDirectory.listSync()
+      .forEach((file) => file.deleteSync());
   }
 
   Future<void> _loadPdfFiles({bool showFullLoading = true}) async {
@@ -72,7 +82,7 @@ class _HomePageState extends State<HomePage> {
         if (mounted) {
           ScaffoldMessenger.of(
             context,
-          ).showSnackBar(const SnackBar(content: Text("File deleted")));
+          ).showSnackBar(const SnackBar(content: Text("File deleted"), duration: Duration(milliseconds: 500)));
         }
       }
     } catch (e) {
@@ -140,6 +150,7 @@ class _HomePageState extends State<HomePage> {
     ).then((success) async {
       if (success == true) {
         await _loadPdfFiles(showFullLoading: false);
+        await _clearTempCameraPictures();
       }
     });
   }
