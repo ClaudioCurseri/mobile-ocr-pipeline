@@ -36,7 +36,7 @@ class _HomePageState extends State<HomePage> {
     final directory = await getApplicationDocumentsDirectory();
     if (!directory.existsSync()) return;
     final cameraDirectory = Directory('${directory.path}/camera/pictures');
-    if (!directory.existsSync()) return;
+    if (!cameraDirectory.existsSync()) return;
     cameraDirectory.listSync()
       .forEach((file) => file.deleteSync());
   }
