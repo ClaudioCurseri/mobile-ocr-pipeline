@@ -316,19 +316,19 @@ std::string matchCase(const std::string& original, std::string replacement) {
 }
 
 // replaces every word with the top result from the assets ONLY IF the following conditions are met:
-// - the word has a confidence lower than 80
+// - the word has a confidence lower than 60
 // - the word is not a number or empty
 // - the word is longer than a given value
 std::string TextRecognitionPipeline::replaceWithTopResult(const std::string &word, float confidence) const {
     // only replace words with lower confidence
-    if (confidence > 80.0f) {
+    if (confidence > 60.0f) {
         return word;
     }
 
     TokenParts parts = extractParts(word);
 
     // skip numbers or very short tokens
-    if (parts.word.empty() || isNumber(parts.word) || parts.word.length() < 3) {
+    if (parts.word.empty() || isNumber(parts.word) || parts.word.length() < 2) {
         return word;
     }
 
@@ -336,10 +336,8 @@ std::string TextRecognitionPipeline::replaceWithTopResult(const std::string &wor
     std::string searchKey = parts.word;
     std::ranges::transform(searchKey, searchKey.begin(), [](const unsigned char c){ return std::tolower(c); });
 
-    // edit distance based on word length
-    // short words (< 5 chars) -> max distance 1
-    // long words (>= 5 chars) -> max distance 2
-    int maxDist = parts.word.length() < 5 ? 1 : 2;
+    // edit distance
+    int maxDist = 1;
 
     auto suggestions = this->symspell->lookup(searchKey, yams::symspell::Verbosity::All, maxDist);
 
@@ -356,11 +354,6 @@ std::string TextRecognitionPipeline::replaceWithTopResult(const std::string &wor
     });
 
     const auto& bestMatch = suggestions[0];
-
-    // reject match with high edit distance and reasonable confidence to avoid falsely correcting OOV words
-    if (bestMatch.distance >= 2 && confidence > 50.0f) {
-        return word;
-    }
 
     // return result
     if (bestMatch.distance == 0) {
@@ -386,14 +379,14 @@ struct ScoredCandidate {
 
 std::string TextRecognitionPipeline::replaceWithContext(const std::string &previousWord, const std::string &currentWord, float confidence) const {
     // only replace words with lower confidence
-    if (confidence > 80.0f) {
+    if (confidence > 60.0f) {
         return currentWord;
     }
 
     TokenParts parts = extractParts(currentWord);
 
     // skip numbers or very short tokens
-    if (parts.word.empty() || isNumber(parts.word) || parts.word.length() < 3) {
+    if (parts.word.empty() || isNumber(parts.word) || parts.word.length() < 2) {
         return currentWord;
     }
 
@@ -401,10 +394,8 @@ std::string TextRecognitionPipeline::replaceWithContext(const std::string &previ
     std::string currentLowercase = parts.word;
     std::ranges::transform(currentLowercase, currentLowercase.begin(), [](const unsigned char c){ return std::tolower(c); });
 
-    // edit distance based on word length
-    // short words (< 5 chars) -> max distance 1
-    // long words (>= 5 chars) -> max distance 2
-    int maxDist = currentLowercase.length() < 5 ? 1 : 2;
+    // edit distance
+    int maxDist = 1;
 
     // return exact match
     if (const auto exactMatch = this->symspell->lookup(currentLowercase, yams::symspell::Verbosity::Top, 0); !exactMatch.empty()) return currentWord;
@@ -460,11 +451,6 @@ std::string TextRecognitionPipeline::replaceWithContext(const std::string &previ
 
     if (candidates.empty()) return currentWord;
     const auto& bestCandidate = candidates.front();
-
-    // reject match with high edit distance and reasonable confidence to avoid falsely correcting OOV words
-    if (bestCandidate.distance >= 2 && confidence > 50.0f) {
-        return currentWord;
-    }
 
     // return result
     std::string correctedWord = matchCase(parts.word, bestCandidate.term);
