@@ -394,57 +394,54 @@ std::string TextRecognitionPipeline::replaceWithContext(const std::string &previ
     std::string currentLowercase = parts.word;
     std::ranges::transform(currentLowercase, currentLowercase.begin(), [](const unsigned char c){ return std::tolower(c); });
 
-    // edit distance
+    // unigrams within max edit distance
     int maxDist = 1;
+    auto unigramCandidates = this->symspell->lookup(currentLowercase, yams::symspell::Verbosity::All, maxDist);
 
-    // return exact match
-    if (const auto exactMatch = this->symspell->lookup(currentLowercase, yams::symspell::Verbosity::Top, 0); !exactMatch.empty()) return currentWord;
-
-    // get all unigrams within max edit distance
-    const auto unigramCandidates = this->symspell->lookup(currentLowercase, yams::symspell::Verbosity::All, maxDist);
     if (unigramCandidates.empty()) return currentWord;
 
-    // get all unigrams of the previous word
     std::string cleanPrev = cleanWordForLookup(previousWord);
     long long previousUnigramCount = 0;
+    bool hasValidContext = false;
+
     if (!cleanPrev.empty()) {
         const auto suggestion = this->symspell->lookup(cleanPrev, yams::symspell::Verbosity::Top, 0);
-        previousUnigramCount = suggestion.empty() ? 0 : suggestion[0].frequency;
+        if (!suggestion.empty()) {
+            previousUnigramCount = suggestion[0].frequency;
+            hasValidContext = true;
+        }
     }
 
-    // set count of all previous unigrams, fixed value as a fallback
     const long long N = this->totalUnigramCount > 0 ? this->totalUnigramCount : 1000000;
-
     std::vector<ScoredCandidate> candidates;
 
     // scoring
     for (const auto& candidate : unigramCandidates) {
-        constexpr double lambda = 0.7;
+
+        double lambda = hasValidContext ? 0.3 : 0.0;
+
         // unigram probability
         const double pUnigram = static_cast<double>(candidate.frequency) / static_cast<double>(N);
 
         // bigram probability
         double pBigram = 0.0;
-        if (previousUnigramCount > 0) {
+
+        if (hasValidContext && previousUnigramCount > 0) {
             std::string bigramKey = cleanPrev + " " + candidate.term;
             const auto suggestion = this->biSymspell->lookup(bigramKey, yams::symspell::Verbosity::Top, 0);
             long long bigramCount = suggestion.empty() ? 0 : suggestion[0].frequency;
 
-            // additive smoothing to prevent zero-probability
-            pBigram = static_cast<double>(bigramCount + 1) / static_cast<double>(previousUnigramCount + N);
-        } else {
-             pBigram = pUnigram;
+            // MLE
+            pBigram = static_cast<double>(bigramCount) / static_cast<double>(previousUnigramCount);
         }
 
         // Jelinek-Mercer Smoothing
         double probability = lambda * pBigram + (1.0 - lambda) * pUnigram;
 
-        // divide score by 100 per every edit distance -> prefer words with lower edit distance
-        double finalScore = probability / std::pow(100.0, candidate.distance);
-
-        candidates.push_back(ScoredCandidate{candidate.term, finalScore, candidate.distance});
+        candidates.push_back(ScoredCandidate{candidate.term, probability, candidate.distance});
     }
 
+    // sort descending by score
     std::ranges::sort(candidates, [](const ScoredCandidate &a, const ScoredCandidate &b) {
         return a.probability > b.probability;
     });
@@ -452,13 +449,17 @@ std::string TextRecognitionPipeline::replaceWithContext(const std::string &previ
     if (candidates.empty()) return currentWord;
     const auto& bestCandidate = candidates.front();
 
-    // return result
+    if (bestCandidate.term == currentLowercase) {
+        return currentWord;
+    }
+
     std::string correctedWord = matchCase(parts.word, bestCandidate.term);
     auto finalResult = parts.prefix + correctedWord + parts.suffix;
 
     std::cout << "Replaced " << currentWord << " with " << finalResult
                   << " | Conf: " << confidence
-                  << " | Context: [" << cleanPrev << "]" << std::endl;
+                  << " | Context: [" << cleanPrev << "]"
+                  << " | Score: " << bestCandidate.probability << std::endl;
 
     return finalResult;
 }
