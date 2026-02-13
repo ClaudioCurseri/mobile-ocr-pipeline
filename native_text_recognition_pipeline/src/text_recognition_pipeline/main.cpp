@@ -83,8 +83,7 @@ int main() {
         }
     }
 
-    unsigned int maxThreads = std::thread::hardware_concurrency();
-    unsigned int numThreads = maxThreads > 2 ? maxThreads - 2 : 1;
+    unsigned int numThreads = std::thread::hardware_concurrency();
 
     std::cout << "Found " << allJobs.size() << " images. Processing with " << numThreads << " threads..." << std::endl;
 

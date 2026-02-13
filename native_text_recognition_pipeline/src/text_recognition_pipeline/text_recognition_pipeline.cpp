@@ -418,31 +418,32 @@ std::string TextRecognitionPipeline::replaceWithContext(const std::string &previ
     // scoring
     for (const auto& candidate : unigramCandidates) {
 
-        double lambda = hasValidContext ? 0.3 : 0.0;
-
-        // unigram probability
-        const double pUnigram = static_cast<double>(candidate.frequency) / static_cast<double>(N);
-
-        // bigram probability
-        double pBigram = 0.0;
+        double score = 0.0;
+        bool foundBigram = false;
 
         if (hasValidContext && previousUnigramCount > 0) {
             std::string bigramKey = cleanPrev + " " + candidate.term;
             const auto suggestion = this->biSymspell->lookup(bigramKey, yams::symspell::Verbosity::Top, 0);
-            long long bigramCount = suggestion.empty() ? 0 : suggestion[0].frequency;
-
-            // MLE
-            pBigram = static_cast<double>(bigramCount) / static_cast<double>(previousUnigramCount);
+            if (!suggestion.empty()) {
+                long long bigramCount = suggestion[0].frequency;
+                // MLE
+                score = static_cast<double>(bigramCount) / static_cast<double>(previousUnigramCount);
+                foundBigram = true;
+            }
         }
-
-        // Jelinek-Mercer Smoothing
-        double probability = lambda * pBigram + (1.0 - lambda) * pUnigram;
-
-        candidates.push_back(ScoredCandidate{candidate.term, probability, candidate.distance});
+        // stupid backoff
+        if (!foundBigram) {
+            double pUnigram = static_cast<double>(candidate.frequency) / static_cast<double>(N);
+            score = 0.4 * pUnigram;
+        }
+        candidates.push_back(ScoredCandidate{candidate.term, score, candidate.distance});
     }
 
     // sort descending by score
     std::ranges::sort(candidates, [](const ScoredCandidate &a, const ScoredCandidate &b) {
+        if (a.distance != b.distance) {
+            return a.distance < b.distance;
+        }
         return a.probability > b.probability;
     });
 
