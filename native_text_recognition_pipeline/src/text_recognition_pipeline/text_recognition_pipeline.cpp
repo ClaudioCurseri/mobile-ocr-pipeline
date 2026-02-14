@@ -127,7 +127,7 @@ void TextRecognitionPipeline::dewarpImage() {
     for (const auto& contour : contours) {
         double area = cv::contourArea(contour);
         // do not accept contours that are too small
-        if ( area < imageArea * 0.1) {
+        if ( area < imageArea * 0.25) {
             continue;
         }
 
@@ -250,7 +250,7 @@ void TextRecognitionPipeline::postprocessingStep(PostprocessingConfig config) {
                 continue;
             }
             const auto confidence = this->tesseractRecognitionResult->Confidence(level);
-            if (config.useTopResultFromDictionary) word = replaceWithTopResult(word, confidence);
+            if (config.useTopResultFromDictionary && !config.useContext) word = replaceWithTopResult(word, confidence);
             if (config.useContext) word = replaceWithContext(previousWord, word, confidence);
             int x1, y1, x2, y2;
             this->tesseractRecognitionResult->BoundingBox(level, &x1, &y1, &x2, &y2);
@@ -316,12 +316,12 @@ std::string matchCase(const std::string& original, std::string replacement) {
 }
 
 // replaces every word with the top result from the assets ONLY IF the following conditions are met:
-// - the word has a confidence lower than 60
+// - the word has a confidence lower than 75
 // - the word is not a number or empty
 // - the word is longer than a given value
 std::string TextRecognitionPipeline::replaceWithTopResult(const std::string &word, float confidence) const {
     // only replace words with lower confidence
-    if (confidence > 60.0f) {
+    if (confidence > 75.0f) {
         return word;
     }
 
@@ -379,7 +379,7 @@ struct ScoredCandidate {
 
 std::string TextRecognitionPipeline::replaceWithContext(const std::string &previousWord, const std::string &currentWord, float confidence) const {
     // only replace words with lower confidence
-    if (confidence > 60.0f) {
+    if (confidence > 75.0f) {
         return currentWord;
     }
 
