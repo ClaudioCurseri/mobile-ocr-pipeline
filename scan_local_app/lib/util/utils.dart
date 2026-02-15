@@ -99,7 +99,7 @@ Future<bool> writeFile(pw.Document pdf) async {
     var file = await setLocalFileReference(
       "scanned_doc_${DateTime.now().millisecondsSinceEpoch}.pdf",
     );
-    file.writeAsBytes(await pdf.save());
+    await file.writeAsBytes(await pdf.save());
     print("File written at $file");
   } catch (e) {
     print('Error in writing file=$e');

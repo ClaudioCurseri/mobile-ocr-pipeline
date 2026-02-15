@@ -41,42 +41,34 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _clearTempCameraPictures() async {
     final directory = await getApplicationDocumentsDirectory();
-    if (!directory.existsSync()) return;
     final cameraDirectory = Directory('${directory.path}/camera/pictures');
-    if (!cameraDirectory.existsSync()) return;
-    cameraDirectory.listSync().forEach((file) => file.deleteSync());
+    if (cameraDirectory.existsSync()) {
+      cameraDirectory.listSync().forEach((file) => file.deleteSync());
+    }
   }
 
   Future<void> _loadPdfFiles({bool showFullLoading = true}) async {
-    if (showFullLoading) {
-      setState(() => _isLoading = true);
-    }
+    if (showFullLoading) setState(() => _isLoading = true);
 
     final directory = await getApplicationDocumentsDirectory();
+    List<FileSystemEntity> files = [];
 
     if (directory.existsSync()) {
-      final List<FileSystemEntity> files = directory
-          .listSync()
-          .where((file) => file.path.endsWith('.pdf'))
-          .toList();
+      files =
+          directory
+              .listSync()
+              .where((file) => file.path.toLowerCase().endsWith('.pdf'))
+              .toList()
+            ..sort(
+              (a, b) => b.statSync().modified.compareTo(a.statSync().modified),
+            );
+    }
 
-      files.sort((a, b) {
-        return b.statSync().modified.compareTo(a.statSync().modified);
+    if (mounted) {
+      setState(() {
+        _pdfFiles = files;
+        _isLoading = false;
       });
-
-      if (mounted) {
-        setState(() {
-          _pdfFiles = files;
-          _isLoading = false;
-        });
-      }
-    } else {
-      if (mounted) {
-        setState(() {
-          _pdfFiles = [];
-          _isLoading = false;
-        });
-      }
     }
   }
 
@@ -100,89 +92,172 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _renameFile(FileSystemEntity file) async {
-    final TextEditingController nameController = TextEditingController();
     final oldName = path.basenameWithoutExtension(file.path);
-    nameController.text = oldName;
-
-    await showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text("Rename File"),
-          content: TextField(
-            controller: nameController,
-            decoration: const InputDecoration(hintText: "Enter new name"),
-            autofocus: true,
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text("Cancel"),
-            ),
-            TextButton(
-              onPressed: () async {
-                final newName = nameController.text.trim();
-                if (newName.isNotEmpty && newName != oldName) {
-                  final dir = path.dirname(file.path);
-                  final newPath = path.join(dir, "$newName.pdf");
-                  final newFile = File(newPath);
-
-                  if (await newFile.exists()) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text("Name already exists")),
-                      );
-                    }
-                  } else {
-                    await file.rename(newPath);
-                    if (context.mounted) Navigator.pop(context);
-                    await _loadPdfFiles(showFullLoading: false);
-                  }
-                }
-              },
-              child: const Text("Rename"),
-            ),
-          ],
-        );
-      },
+    final TextEditingController nameController = TextEditingController(
+      text: oldName,
     );
+
+    final newName = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Rename File"),
+        content: TextField(
+          controller: nameController,
+          decoration: const InputDecoration(hintText: "Enter new name"),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel"),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, nameController.text.trim()),
+            child: const Text("Rename"),
+          ),
+        ],
+      ),
+    );
+
+    if (newName != null && newName.isNotEmpty && newName != oldName) {
+      final dir = path.dirname(file.path);
+      final newPath = path.join(dir, "$newName.pdf");
+
+      if (await File(newPath).exists()) {
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text("Name already exists")));
+        }
+      } else {
+        await file.rename(newPath);
+        await _loadPdfFiles(showFullLoading: false);
+      }
+    }
   }
 
   void _shareFile(String filePath) {
     SharePlus.instance.share(ShareParams(files: [XFile(filePath)]));
   }
 
-  void _navigateToScanPage() {
-    Navigator.push(
+  Future<void> _navigateAndRefresh(
+    Widget page, {
+    bool clearTempPictures = false,
+  }) async {
+    final success = await Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (context) => ScanPage(
-          camera: widget.camera,
-          textRecognitionPipeline: widget.textRecognitionPipeline,
-        ),
-      ),
-    ).then((success) async {
-      if (success == true) {
-        await _loadPdfFiles(showFullLoading: false);
-        await _clearTempCameraPictures();
-      }
-    });
+      MaterialPageRoute(builder: (context) => page),
+    );
+
+    if (success == true) {
+      await _loadPdfFiles(showFullLoading: false);
+      if (clearTempPictures) await _clearTempCameraPictures();
+    }
   }
 
-  void _navigateToScanFromFilesPage(List<XFile> files) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => ScanFromFilesPage(
+  Future<void> _pickFiles() async {
+    FilePickerResult? result = await FilePicker.platform.pickFiles(
+      allowedExtensions: ['jpg', 'jpeg', 'png', 'tiff', 'tif'],
+      type: FileType.custom,
+      allowMultiple: true,
+    );
+
+    if (result != null && result.xFiles.isNotEmpty) {
+      _navigateAndRefresh(
+        ScanFromFilesPage(
           textRecognitionPipeline: widget.textRecognitionPipeline,
-          files: files,
+          files: result.xFiles,
+        ),
+      );
+    }
+  }
+
+  Future<void> _pickImages() async {
+    final List<XFile> images = await ImagePicker().pickMultiImage();
+    if (images.isNotEmpty) {
+      _navigateAndRefresh(
+        ScanFromFilesPage(
+          textRecognitionPipeline: widget.textRecognitionPipeline,
+          files: images,
+        ),
+      );
+    }
+  }
+
+  Widget _buildEmptyState(BuildContext context, BoxConstraints constraints) {
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      child: SizedBox(
+        height: constraints.maxHeight,
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.document_scanner,
+                color: Theme.of(context).colorScheme.primary,
+                size: 75,
+              ),
+              const SizedBox(height: 15),
+              const Text(
+                "Scan documents to view them here.",
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
         ),
       ),
-    ).then((success) async {
-      if (success == true) {
-        await _loadPdfFiles(showFullLoading: false);
-      }
-    });
+    );
+  }
+
+  Widget _buildPdfTile(FileSystemEntity file) {
+    final fileName = path.basename(file.path);
+    final lastModified = file.statSync().modified;
+
+    return Slidable(
+      key: ValueKey(file.path),
+      startActionPane: ActionPane(
+        motion: const ScrollMotion(),
+        children: [
+          SlidableAction(
+            onPressed: (_) => _deleteFile(file),
+            backgroundColor: Theme.of(context).colorScheme.error,
+            foregroundColor: Theme.of(context).colorScheme.onError,
+            icon: Icons.delete,
+            label: 'Delete',
+          ),
+          SlidableAction(
+            onPressed: (_) => _renameFile(file),
+            backgroundColor: Theme.of(context).colorScheme.secondary,
+            foregroundColor: Theme.of(context).colorScheme.onSecondary,
+            icon: Icons.edit,
+            label: 'Rename',
+          ),
+        ],
+      ),
+      endActionPane: ActionPane(
+        motion: const ScrollMotion(),
+        children: [
+          SlidableAction(
+            onPressed: (_) => _shareFile(file.path),
+            backgroundColor: Theme.of(context).colorScheme.tertiary,
+            foregroundColor: Theme.of(context).colorScheme.onTertiary,
+            icon: Icons.share,
+            label: 'Share',
+          ),
+        ],
+      ),
+      child: ListTile(
+        leading: const Icon(Icons.picture_as_pdf, color: Colors.red),
+        title: Text(fileName),
+        subtitle: Text("Date: ${lastModified.toString().split('.')[0]}"),
+        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => PDFViewerPage(filePath: file.path)),
+        ),
+      ),
+    );
   }
 
   @override
@@ -192,12 +267,10 @@ class _HomePageState extends State<HomePage> {
         title: const Text("ScanLocal"),
         actions: [
           IconButton(
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const SettingsPage()),
-              );
-            },
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const SettingsPage()),
+            ),
             icon: const Icon(Icons.settings_rounded),
           ),
         ],
@@ -218,125 +291,25 @@ class _HomePageState extends State<HomePage> {
                 : RefreshIndicator(
                     onRefresh: () => _loadPdfFiles(showFullLoading: false),
                     child: _pdfFiles.isEmpty
-                        ? LayoutBuilder(
-                            builder: (context, constraints) =>
-                                SingleChildScrollView(
-                                  physics:
-                                      const AlwaysScrollableScrollPhysics(),
-                                  child: SizedBox(
-                                    height: constraints.maxHeight,
-                                    child: Center(
-                                      child: Column(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        children: [
-                                          Icon(
-                                            Icons.document_scanner,
-                                            color: Theme.of(
-                                              context,
-                                            ).colorScheme.primary,
-                                            size: 75,
-                                          ),
-                                          const SizedBox(height: 15),
-                                          const Text(
-                                            "Scan documents to view them here.",
-                                            textAlign: TextAlign.center,
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                          )
+                        ? LayoutBuilder(builder: _buildEmptyState)
                         : ListView.builder(
                             physics: const AlwaysScrollableScrollPhysics(),
                             itemCount: _pdfFiles.length,
-                            itemBuilder: (context, index) {
-                              final file = _pdfFiles[index];
-                              final fileName = path.basename(file.path);
-                              final lastModified = file.statSync().modified;
-
-                              return Slidable(
-                                key: ValueKey(file.path),
-
-                                startActionPane: ActionPane(
-                                  motion: const ScrollMotion(),
-                                  children: [
-                                    SlidableAction(
-                                      onPressed: (context) => _deleteFile(file),
-                                      backgroundColor: Theme.of(
-                                        context,
-                                      ).colorScheme.error,
-                                      foregroundColor: Theme.of(
-                                        context,
-                                      ).colorScheme.onError,
-                                      icon: Icons.delete,
-                                      label: 'Delete',
-                                    ),
-                                    SlidableAction(
-                                      onPressed: (context) => _renameFile(file),
-                                      backgroundColor: Theme.of(
-                                        context,
-                                      ).colorScheme.secondary,
-                                      foregroundColor: Theme.of(
-                                        context,
-                                      ).colorScheme.onSecondary,
-                                      icon: Icons.edit,
-                                      label: 'Rename',
-                                    ),
-                                  ],
-                                ),
-
-                                endActionPane: ActionPane(
-                                  motion: const ScrollMotion(),
-                                  children: [
-                                    SlidableAction(
-                                      onPressed: (context) =>
-                                          _shareFile(file.path),
-                                      backgroundColor: Theme.of(
-                                        context,
-                                      ).colorScheme.tertiary,
-                                      foregroundColor: Theme.of(
-                                        context,
-                                      ).colorScheme.onTertiary,
-                                      icon: Icons.share,
-                                      label: 'Share',
-                                    ),
-                                  ],
-                                ),
-
-                                child: ListTile(
-                                  leading: const Icon(
-                                    Icons.picture_as_pdf,
-                                    color: Colors.red,
-                                  ),
-                                  title: Text(fileName),
-                                  subtitle: Text(
-                                    "Date: ${lastModified.toString().split('.')[0]}",
-                                  ),
-                                  trailing: const Icon(
-                                    Icons.arrow_forward_ios,
-                                    size: 16,
-                                  ),
-                                  onTap: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) =>
-                                            PDFViewerPage(filePath: file.path),
-                                      ),
-                                    );
-                                  },
-                                ),
-                              );
-                            },
+                            itemBuilder: (context, index) =>
+                                _buildPdfTile(_pdfFiles[index]),
                           ),
                   ),
           ),
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: _navigateToScanPage,
+        onPressed: () => _navigateAndRefresh(
+          ScanPage(
+            camera: widget.camera,
+            textRecognitionPipeline: widget.textRecognitionPipeline,
+          ),
+          clearTempPictures: true,
+        ),
         child: const Icon(Icons.camera_enhance_rounded),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.endContained,
@@ -344,37 +317,14 @@ class _HomePageState extends State<HomePage> {
         padding: const EdgeInsets.symmetric(horizontal: 10),
         notchMargin: 5,
         child: Row(
-          mainAxisSize: MainAxisSize.max,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             IconButton(
-              onPressed: () async {
-                FilePickerResult? result = await FilePicker.platform.pickFiles(
-                  allowedExtensions: ['jpg', 'jpeg', 'png', 'tiff', 'tif'],
-                  type: FileType.custom,
-                  allowMultiple: true,
-                );
-
-                if (result == null) {
-                  // user canceled file picker
-                  return;
-                }
-
-                List<XFile> files = result.xFiles;
-                if (files.isEmpty) return;
-
-                _navigateToScanFromFilesPage(files);
-              },
+              onPressed: _pickFiles,
               icon: const Icon(Icons.upload_file_rounded),
             ),
             IconButton(
-              onPressed: () async {
-                final ImagePicker picker = ImagePicker();
-                final List<XFile> images = await picker.pickMultiImage();
-                if (images.isEmpty) return;
-
-                _navigateToScanFromFilesPage(images);
-              },
+              onPressed: _pickImages,
               icon: const Icon(Icons.photo_rounded),
             ),
           ],
@@ -397,9 +347,8 @@ class PDFViewerPage extends StatelessWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.share),
-            onPressed: () {
-              SharePlus.instance.share(ShareParams(files: [XFile(filePath)]));
-            },
+            onPressed: () =>
+                SharePlus.instance.share(ShareParams(files: [XFile(filePath)])),
           ),
         ],
       ),
