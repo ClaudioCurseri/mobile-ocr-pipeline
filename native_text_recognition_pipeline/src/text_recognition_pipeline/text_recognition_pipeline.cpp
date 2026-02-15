@@ -19,7 +19,11 @@ void TextRecognitionPipeline::preprocessingStep(const PreprocessingConfig config
 
 void TextRecognitionPipeline::setImage(const char* imagePath) {
     const auto image = cv::imread(imagePath, cv::IMREAD_COLOR);
-    if (this->image.cols != 3096 && this->image.rows != 4128) cv::resize(image, this->image, cv::Size(3096, 4128));
+    if (image.cols != 3096 && image.rows != 4128) {
+        cv::resize(image, this->image, cv::Size(3096, 4128));
+    } else {
+        this->image = image.clone();
+    }
     this->internalImage = this->image.clone();
     this->api->SetImage(image.data, image.cols, image.rows, image.channels(), image.step);
 }
@@ -37,21 +41,24 @@ void TextRecognitionPipeline::convertToBinaryImage() {
         cv::cvtColor(this->internalImage, this->internalImage, cv::COLOR_RGB2GRAY);
     }
     // illumination correction
-    cv::Mat background;
+    cv::Mat downscaled, background;
+    constexpr double scaleRatio = 0.25;
+    cv::resize(this->internalImage, downscaled, cv::Size(), scaleRatio, scaleRatio);
     const cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(25, 25));
-    cv::morphologyEx(this->internalImage, background, cv::MORPH_CLOSE, kernel);
+    cv::morphologyEx(downscaled, background, cv::MORPH_CLOSE, kernel);
+    cv::resize(background, background, this->internalImage.size());
     cv::divide(this->internalImage, background, this->internalImage, 255, -1);
 
     // denoising
     cv::GaussianBlur(this->internalImage, this->internalImage, cv::Size(3, 3), 0);
 
-    // adaptive thresholding
     cv::adaptiveThreshold(this->internalImage, this->internalImage,
-                          255,
-                          cv::ADAPTIVE_THRESH_GAUSSIAN_C,
-                          cv::THRESH_BINARY,
-                          31,
-                          10);
+                      255,
+                      cv::ADAPTIVE_THRESH_GAUSSIAN_C,
+                      cv::THRESH_BINARY,
+                      81,
+                      15);
+
 }
 
 void TextRecognitionPipeline::unsharpMasking() {
@@ -250,6 +257,7 @@ void TextRecognitionPipeline::postprocessingStep(PostprocessingConfig config) {
                 continue;
             }
             const auto confidence = this->tesseractRecognitionResult->Confidence(level);
+            if (confidence < 25 && word.length() < 3) continue;
             if (config.useTopResultFromDictionary && !config.useContext) word = replaceWithTopResult(word, confidence);
             if (config.useContext) word = replaceWithContext(previousWord, word, confidence);
             int x1, y1, x2, y2;
@@ -290,14 +298,14 @@ struct TokenParts {
     std::string suffix;
 };
 
-// returns the word as a TokenParts struct 
+// returns the word as a TokenParts struct
 TokenParts extractParts(const std::string& text) {
     // regex: (non-alnum prefix) (alnum word) (non-alnum suffix)
     const std::regex re(R"(^([^a-zA-Z0-9]*)([a-zA-Z0-9]+)([^a-zA-Z0-9]*)$)");
     if (std::smatch match; std::regex_search(text, match, re)) {
         return {match[1].str(), match[2].str(), match[3].str()};
     }
-    return {"", text, ""}; 
+    return {"", text, ""};
 }
 
 // detects case and applies it to the replacement
