@@ -5,7 +5,7 @@
 ## Project Structure
 
 * `evaluation`: Contains a Python script to evaluate the OCR pipeline.
-* `native_text_recognition_pipeline`: Contains a Dart package that binds the native source code. The actual C++ implementation of the text recognition pipeline is inside the `src/` folder.
+* `native_text_recognition_pipeline`: Contains a Dart package that binds a C++ implementation of the OCR pipeline to native code and builds the native components. The C++ implementation of the text recognition pipeline is inside the `src/` folder.
 * `scan_local_app`: Contains a Flutter application compatible with Android and iOS. The app utilizes the native text recognition pipeline for document scanning.
 
 ## License Note
@@ -23,5 +23,6 @@ Additionally, some parts of this project use third party components:
     - [Google Books Ngram data](http://storage.googleapis.com/books/ngrams/books/datasetsv2.html)   [(License)](https://creativecommons.org/licenses/by/3.0/)
     - [SCOWL - Spell Checker Oriented Word Lists](http://wordlist.aspell.net/)   [(License)](http://wordlist.aspell.net/scowl-readme/)
     - [`More details`](scan_local_app/assets/licenses/dictionaries.txt)
+- [JiWER](https://github.com/jitsi/jiwer) for WER and CER evaluation of the OCR pipeline.
 - A test dataset to evaluate the C++ implementation of the OCR pipeline: 
    - Burie, J.-C., Chazalon, J., Coustaty, M., Eskenazi, S., Luqman, M. M., Mehri, M., Nayef, N., OGIER, J.-M., Prum, S., & Rusinol, M. (2015). ICDAR2015 competition on smartphone document capture and OCR (SmartDoc) - Challenge 2 [Data set]. Zenodo. https://doi.org/10.5281/zenodo.2572929
