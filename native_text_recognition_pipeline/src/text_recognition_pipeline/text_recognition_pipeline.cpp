@@ -107,7 +107,7 @@ void TextRecognitionPipeline::dewarpImage() {
 
     // edge detection was too strict and made the picture mostly black?
     // -> then try again with lower thresholds and the original grayscale image
-    if (cv::countNonZero(edged) < 200000) {
+    if (double totalPixels = gray.rows * gray.cols; cv::countNonZero(edged) < totalPixels * 0.015) {
         cv::Canny(gray, edged, 25, 75);
     }
 
