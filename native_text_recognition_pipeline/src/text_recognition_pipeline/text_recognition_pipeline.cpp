@@ -94,30 +94,39 @@ std::vector<cv::Point2f> orderPoints(const std::vector<cv::Point>& pts) {
 }
 
 void TextRecognitionPipeline::dewarpImage() {
-    // make sure we always work with a grayscale image to detect the edges better
-    cv::Mat gray;
+    // extract the grayscale and hsv image
+    cv::Mat gray, hsv, saturation;
     cv::cvtColor(this->image, gray, cv::COLOR_RGB2GRAY);
+    cv::cvtColor(this->image, hsv, cv::COLOR_RGB2HSV);
+
+    // extract the saturation channel
+    cv::extractChannel(hsv, saturation, 1);
 
     // denoising
-    cv::GaussianBlur(gray, gray, cv::Size(7, 7), 0);
+    cv::Mat filteredGray, filteredSaturation;
+    cv::GaussianBlur(gray, filteredGray, cv::Size(7, 7), 0);
+    cv::GaussianBlur(saturation, filteredSaturation, cv::Size(7, 7), 0);
 
     // edge detection
-    cv::Mat edged;
-    cv::Canny(gray, edged, 75, 200);
+    cv::Mat edgesGray;
+    cv::Canny(filteredGray, edgesGray, 30, 100);
 
-    // edge detection was too strict and made the picture mostly black?
-    // -> then try again with lower thresholds and the original grayscale image
-    if (double totalPixels = gray.rows * gray.cols; cv::countNonZero(edged) < totalPixels * 0.015) {
-        cv::Canny(gray, edged, 25, 75);
-    }
+    cv::Mat maskSat, edgesSaturation;
+    cv::threshold(filteredSaturation, maskSat, 0, 255, cv::THRESH_OTSU);
+    cv::Canny(maskSat, edgesSaturation, 30, 100);
 
-    // dilation -> all structures grow, increases chance of finding the document contours
-    cv::Mat dilated;
-    cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(5, 7));
-    cv::dilate(edged, dilated, kernel, cv::Point(-1, -1), 1);
+    // combine the detected edges from both image types
+    cv::Mat combinedEdges;
+    cv::bitwise_or(edgesGray, edgesSaturation, combinedEdges);
+
+    // closing to connect broken edges
+    cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(5, 5));
+    cv::Mat closed;
+    cv::morphologyEx(combinedEdges, closed, cv::MORPH_CLOSE, kernel);
+
     // find all contours
     std::vector<std::vector<cv::Point>> contours;
-    cv::findContours(dilated, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+    cv::findContours(closed, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
 
     // sort found contours in descending order
     std::ranges::sort(contours, [](const std::vector<cv::Point>& c1, const std::vector<cv::Point>& c2) {
@@ -134,24 +143,21 @@ void TextRecognitionPipeline::dewarpImage() {
     for (const auto& contour : contours) {
         double area = cv::contourArea(contour);
         // do not accept contours that are too small
-        if ( area < imageArea * 0.25) {
+        if ( area < imageArea * 0.15) {
             continue;
         }
 
         double perimeter = cv::arcLength(contour, true);
         std::vector<cv::Point> approx;
         // try to find four contours
-        for (double epsilon = 0.01; epsilon <= 0.05; epsilon += 0.01) {
-            cv::approxPolyDP(contour, approx, epsilon * perimeter, true);
+            cv::approxPolyDP(contour, approx, 0.02 * perimeter, true);
 
             if (approx.size() == 4) {
                     documentContour = approx;
                     found = true;
-                    goto end_search;
+                    break;
             }
-        }
     }
-end_search:
     // document contours not found
     if (!found) {
         std::cerr << "Unable to find document contours. Returning original image." << std::endl;
