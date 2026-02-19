@@ -75,7 +75,7 @@ int main() {
     std::vector<Job> allJobs;
 
     for (const auto& entry : std::filesystem::directory_iterator(inputDir)) {
-        if (auto limit = 100; allJobs.size() >= limit) break;
+        if (auto limit = 8470; allJobs.size() >= limit) break;
         if (entry.path().extension() == ".jpg") {
             std::string stem = entry.path().stem().string();
             std::filesystem::path outputFilename = stem + ".txt";
