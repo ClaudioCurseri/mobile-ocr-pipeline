@@ -5,9 +5,11 @@ import 'package:scan_local/service/pipeline/text_recognition_pipeline.dart';
 import 'package:flutter/material.dart';
 import 'package:scan_local/theme.dart';
 import 'package:flutter/services.dart';
+import 'package:pdfrx/pdfrx.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  pdfrxFlutterInitialize();
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp
   ]);

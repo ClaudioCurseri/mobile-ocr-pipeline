@@ -1,11 +1,11 @@
 import 'dart:io';
 import 'package:camera/camera.dart';
+import 'package:scan_local/pages/home/pdf_viewer_page.dart';
 import 'package:scan_local/pages/scan/scan_from_files_page.dart';
 import 'package:scan_local/service/pipeline/text_recognition_pipeline.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
-import 'package:flutter_pdfview/flutter_pdfview.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:file_picker/file_picker.dart';
@@ -329,32 +329,6 @@ class _HomePageState extends State<HomePage> {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class PDFViewerPage extends StatelessWidget {
-  final String filePath;
-
-  const PDFViewerPage({super.key, required this.filePath});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(path.basename(filePath)),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.share),
-            onPressed: () =>
-                SharePlus.instance.share(ShareParams(files: [XFile(filePath)])),
-          ),
-        ],
-      ),
-      body: PDFView(
-        filePath: filePath,
-        backgroundColor: Theme.of(context).colorScheme.surface,
       ),
     );
   }
