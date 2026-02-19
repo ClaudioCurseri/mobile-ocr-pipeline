@@ -24,8 +24,8 @@ def main():
         print(f"Error: One of the directories does not exist.\nGT: {GT_DIR}\nPred: {PRED_DIR}")
         return
 
-    # store results: (filename, wer_score, cer_score)
-    results: List[Tuple[str, float, float]] = []
+    # store results: (filename, wer_score, abs_word_errors, cer_score, abs_char_errors)
+    results: List[Tuple[str, float, int, float, int]] = []
     
     # get list of all txt files in the output directory
     pred_files = [f for f in os.listdir(PRED_DIR) if f.endswith(".txt")]
@@ -68,12 +68,19 @@ def main():
             print(f"Warning: Empty ground truth file {filename}. Skipping.")
             continue
 
-        # calculate WER and CER
+        # calculate WER, CER and absolute errors
         try:
-            w = jiwer.wer(reference, hypothesis, hypothesis_transform=transformation_wer)
-            c = jiwer.cer(reference, hypothesis, hypothesis_transform=transformation_cer)
+            # word level metrics
+            word_metrics = jiwer.process_words(reference, hypothesis, hypothesis_transform=transformation_wer)
+            w = word_metrics.wer
+            abs_w_errors = word_metrics.insertions + word_metrics.deletions + word_metrics.substitutions
+            
+            # character level metrics
+            char_metrics = jiwer.process_characters(reference, hypothesis, hypothesis_transform=transformation_cer)
+            c = char_metrics.cer
+            abs_c_errors = char_metrics.insertions + char_metrics.deletions + char_metrics.substitutions
 
-            results.append((filename, w, c))
+            results.append((filename, w, abs_w_errors, c, abs_c_errors))
         except Exception as e:
             print(f"Error processing {filename}: {e}")
 
@@ -84,25 +91,36 @@ def main():
     try:
         with open(CSV_FILE, mode='w', newline='', encoding='utf-8') as file:
             writer = csv.writer(file)
-            writer.writerow(["Filename", "WER", "CER"])
+            writer.writerow(["Filename", "WER", "Abs_Word_Errors", "CER", "Abs_Char_Errors"])
             for r in results:
-                writer.writerow([r[0], f"{r[1]:.4f}", f"{r[2]:.4f}"])
+                writer.writerow([r[0], f"{r[1]:.4f}", r[2], f"{r[3]:.4f}", r[4]])
         print(f"CSV saved to: {CSV_FILE}")
     except Exception as e:
         print(f"Error writing CSV: {e}")
 
-    # calculate average WER and CER
+    # calculate averages
     wer_scores = [r[1] for r in results]
-    cer_scores = [r[2] for r in results]
+    abs_wer_scores = [r[2] for r in results]
+    cer_scores = [r[3] for r in results]
+    abs_cer_scores = [r[4] for r in results]
 
     avg_wer = sum(wer_scores) / len(wer_scores)
+    avg_abs_wer = sum(abs_wer_scores) / len(abs_wer_scores)
     avg_cer = sum(cer_scores) / len(cer_scores)
+    avg_abs_cer = sum(abs_cer_scores) / len(abs_cer_scores)
 
-    # find min/max WER/CER
+    # find min/max entries
     max_wer_entry = max(results, key=lambda x: x[1])
     min_wer_entry = min(results, key=lambda x: x[1])
-    max_cer_entry = max(results, key=lambda x: x[2])
-    min_cer_entry = min(results, key=lambda x: x[2])
+    
+    max_abs_wer_entry = max(results, key=lambda x: x[2])
+    min_abs_wer_entry = min(results, key=lambda x: x[2])
+    
+    max_cer_entry = max(results, key=lambda x: x[3])
+    min_cer_entry = min(results, key=lambda x: x[3])
+    
+    max_abs_cer_entry = max(results, key=lambda x: x[4])
+    min_abs_cer_entry = min(results, key=lambda x: x[4])
 
     # generate report for text file
     report_lines = [
@@ -110,14 +128,23 @@ def main():
         "=================",
         f"Total Files Evaluated: {len(results)}",
         "",
-        f"Average WER: {avg_wer:.4f}",
-        f"Average CER: {avg_cer:.4f}",
+        "--- Word Level Metrics (WER) ---",
+        f"Average WER:             {avg_wer:.4f}",
+        f"Average Abs Word Errors: {avg_abs_wer:.2f}",
         "",
-        f"Highest WER: {max_wer_entry[1]:.4f} (File: {max_wer_entry[0]})",
-        f"Lowest WER:  {min_wer_entry[1]:.4f} (File: {min_wer_entry[0]})",
+        f"Highest WER:             {max_wer_entry[1]:.4f} (File: {max_wer_entry[0]})",
+        f"Lowest WER:              {min_wer_entry[1]:.4f} (File: {min_wer_entry[0]})",
+        f"Highest Abs Word Errors: {max_abs_wer_entry[2]} (File: {max_abs_wer_entry[0]})",
+        f"Lowest Abs Word Errors:  {min_abs_wer_entry[2]} (File: {min_abs_wer_entry[0]})",
         "",
-        f"Highest CER: {max_cer_entry[2]:.4f} (File: {max_cer_entry[0]})",
-        f"Lowest CER:  {min_cer_entry[2]:.4f} (File: {min_cer_entry[0]})"
+        "--- Character Level Metrics (CER) ---",
+        f"Average CER:             {avg_cer:.4f}",
+        f"Average Abs Char Errors: {avg_abs_cer:.2f}",
+        "",
+        f"Highest CER:             {max_cer_entry[3]:.4f} (File: {max_cer_entry[0]})",
+        f"Lowest CER:              {min_cer_entry[3]:.4f} (File: {min_cer_entry[0]})",
+        f"Highest Abs Char Errors: {max_abs_cer_entry[4]} (File: {max_abs_cer_entry[0]})",
+        f"Lowest Abs Char Errors:  {min_abs_cer_entry[4]} (File: {min_abs_cer_entry[0]})"
     ]
 
     report_content = "\n".join(report_lines)
