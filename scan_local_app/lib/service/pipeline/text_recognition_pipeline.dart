@@ -1,3 +1,4 @@
+import 'dart:developer';
 import 'package:camera/camera.dart';
 import 'package:scan_local/util/utils.dart';
 import 'package:text_recognition_pipeline/native_text_recognition_pipeline.dart';
@@ -36,15 +37,24 @@ class TextRecognitionPipeline {
   }
 
   Future<bool> scanDocument(XFile file) async {
+    final scanDocumentTask = TimelineTask()..start('scanDocument');
     var scanSuccessful = false;
     try {
-      textRecognitionPipeline.setImage(file.path);
+      await textRecognitionPipeline.setImage(file.path);
 
+      final preTask = TimelineTask()..start('preprocessingStep');
       await textRecognitionPipeline.preprocessingStep();
+      preTask.finish();
+  
+      final ocrTask = TimelineTask()..start('textRecognitionStep');
       await textRecognitionPipeline.textRecognitionStep();
+      ocrTask.finish();
+  
+      final postTask = TimelineTask()..start('postprocessingStep');
       await textRecognitionPipeline.postprocessingStep();
+      postTask.finish();
 
-      final imageBytes = textRecognitionPipeline.getImage();
+      final imageBytes = await textRecognitionPipeline.getImage();
 
       if (imageBytes != null) {
         final recognitionResult = textRecognitionPipeline
@@ -57,6 +67,7 @@ class TextRecognitionPipeline {
     } on Exception catch (e) {
       print("An error occured while scanning the document: $e");
     }
+    scanDocumentTask.finish();
     return scanSuccessful;
   }
 

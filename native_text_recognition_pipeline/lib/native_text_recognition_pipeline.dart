@@ -25,29 +25,36 @@ class NativeTextRecognitionPipeline {
     calloc.free(postprocessingConfig);
   }
 
-  void setImage(String path) {
-    final cPath = path.toNativeUtf8();
-
-    try {
-      TextRecognition_setImage(textRecognitionPipeline, cPath.cast());
-    } finally {
-      calloc.free(cPath);
-    }
+  Future<void> setImage(String path) async {
+    final ptr = textRecognitionPipeline;
+    
+    await Isolate.run(() {
+      final cPath = path.toNativeUtf8();
+      try {
+        TextRecognition_setImage(ptr, cPath.cast());
+      } finally {
+        calloc.free(cPath);
+      }
+    });
   }
 
-  Uint8List? getImage() {
-    final buffer = TextRecognition_getImage(textRecognitionPipeline);
+  Future<Uint8List?> getImage() async {
+    final ptr = textRecognitionPipeline;
+    
+    return await Isolate.run(() {
+      final buffer = TextRecognition_getImage(ptr);
 
-    if (buffer.imageData == nullptr || buffer.length == 0) {
-      return null;
-    }
+      if (buffer.imageData == nullptr || buffer.length == 0) {
+        return null;
+      }
 
-    try {
-      final cList = buffer.imageData.asTypedList(buffer.length);
-      return Uint8List.fromList(cList);
-    } finally {
-      TextRecognition_freeImage(buffer);
-    }
+      try {
+        final cList = buffer.imageData.asTypedList(buffer.length);
+        return Uint8List.fromList(cList);
+      } finally {
+        TextRecognition_freeImage(buffer);
+      }
+    });
   }
 
   void setPreprocessingConfig(PreprocessingConfig config) {

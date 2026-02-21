@@ -13,7 +13,7 @@ void TextRecognitionPipeline::preprocessingStep(const PreprocessingConfig config
     if (config.unsharpMasking) this->unsharpMasking();
     if (config.binary) this->convertToBinaryImage();
     if (config.resize) this->resizeImage();
-    this->image = this->internalImage.clone();
+    this->image = this->internalImage;
     this->api->SetImage(this->internalImage.data, this->internalImage.cols, this->internalImage.rows, this->internalImage.channels(), this->internalImage.step);
 }
 
@@ -22,10 +22,9 @@ void TextRecognitionPipeline::setImage(const char* imagePath) {
     if (image.cols != 3096 && image.rows != 4128) {
         cv::resize(image, this->image, cv::Size(3096, 4128));
     } else {
-        this->image = image.clone();
+        this->image = image;
     }
     this->internalImage = this->image.clone();
-    this->api->SetImage(image.data, image.cols, image.rows, image.channels(), image.step);
 }
 
 cv::Mat TextRecognitionPipeline::getImage() {
