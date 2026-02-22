@@ -6,7 +6,7 @@ export TOOLCHAIN=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake
 export ANDROID_PLATFORM=android-21
 export BUILD_TYPE=Release
 
-ABIS=("arm64-v8a") 
+ABIS=("arm64-v8a" "armeabi-v7a" "x86_64") 
 ROOT_DIR=$(pwd)
 INSTALL_DIR=$ROOT_DIR/install
 

@@ -7,6 +7,8 @@ This file explains how to compile Tesseract and Leptonica from source in order t
 - Goal: Acquire all required Shared Libraries (.so) and Headers (.h/.hpp).
 - Make sure that all the required programs are installed on your system in order to follow the next steps.
 
+> Important: The libraries have to be build for a certain target architecture. Currently the libraries a built for arm64-v8a, armeabi-v7a and x86_64. In the sections below, replace `TARGET_ARCH` with the respective architecture.
+
 ### 1. Building Tesseract and Leptonica From Source
 
 Follow these steps to compile Tesseract and Leptonica from source using the provided `build_android.sh` script.
@@ -72,9 +74,11 @@ The directories containing the headers have to be placed in this location:
 
 The shared libraries have to be placed in this location:
 
-- native_text_recognition_pipeline/src/text_recognition_pipeline/third_party/android/lib/arm64-v8a/
+- native_text_recognition_pipeline/src/text_recognition_pipeline/third_party/android/lib/TARGET_ARCH/
 
 > Important: A copy from the file `libc++_shared.so` also has to be placed in this location. The file can be found somewhere in the NDK folder on your system.
+
+
 
 ### 3. Integrate OpenCV
 
@@ -84,7 +88,7 @@ Download the Android sdk. Then, place the headers in `opencv2/` in this location
 
 The shared library has to be placed in this location:
 
-- native_text_recognition_pipeline/src/text_recognition_pipeline/third_party/android/lib/arm64-v8a/
+- native_text_recognition_pipeline/src/text_recognition_pipeline/third_party/android/lib/TARGET_ARCH/
 
 ## iOS
 

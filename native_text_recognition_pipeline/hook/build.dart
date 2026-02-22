@@ -8,13 +8,25 @@ void main(List<String> args) async {
     final packageName = input.packageName;
 
     if (input.config.code.targetOS == OS.android) {
+      final inputArchitecture = input.config.code.targetArchitecture.name;
+      var architecture = "arm64-v8a";
+      switch (inputArchitecture) {
+        case "arm64":
+          architecture = "arm64-v8a";
+        case "arm":
+          architecture = "armeabi-v7a";
+        case "x64":
+          architecture = "x86_64";
+        default:
+          architecture = "arm64-v8a";
+      }
       final androidThirdParty = input.packageRoot.resolve(
         'src/$packageName/third_party/android/',
       );
 
       final includeDir = androidThirdParty.resolve('include/');
       final opencvIncludeDir = androidThirdParty.resolve('include/opencv4/');
-      final libDir = androidThirdParty.resolve('lib/arm64-v8a/');
+      final libDir = androidThirdParty.resolve('lib/$architecture/');
 
       final cbuilder = CBuilder.library(
         name: packageName,
@@ -52,7 +64,7 @@ void main(List<String> args) async {
       ];
 
       for (final libName in libsToBundle) {
-        final libUri = androidThirdParty.resolve('lib/arm64-v8a/$libName');
+        final libUri = androidThirdParty.resolve('lib/$architecture/$libName');
 
         output.assets.code.add(
           CodeAsset(
