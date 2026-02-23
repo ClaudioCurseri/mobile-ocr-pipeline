@@ -34,6 +34,33 @@ Future<bool> createSearchablePdf(
         !item.y.isNaN;
   }).toList();
 
+  final List<RecognitionResult> normalizedItems = [];
+  List<RecognitionResult> currentLine = [];
+
+  for (var item in validItems) {
+    currentLine.add(item);
+    
+    if (item.isEndOfLine || item == validItems.last) {
+      if (currentLine.isNotEmpty) {
+        final lineY = currentLine.map((e) => e.y).reduce((a, b) => a < b ? a : b);
+        final lineHeight = currentLine.map((e) => e.height).reduce((a, b) => a > b ? a : b);
+        
+        for (var wordItem in currentLine) {
+          normalizedItems.add(
+            RecognitionResult(
+              text: wordItem.text,
+              x: wordItem.x,
+              y: lineY,
+              width: wordItem.width,
+              height: lineHeight,
+              isEndOfLine: wordItem.isEndOfLine,
+            )
+          );
+        }
+        currentLine.clear();
+      }
+    }
+  }
   pdf.addPage(
     pw.Page(
       pageFormat: PdfPageFormat(imageWidth, imageHeight),
@@ -45,21 +72,24 @@ Future<bool> createSearchablePdf(
               ignoreMargins: true,
               child: pw.Image(pdfImage, fit: pw.BoxFit.cover),
             ),
-
-            ...validItems.map((item) {
+            ...normalizedItems.map((item) {
               return pw.Positioned(
                 left: item.x.toDouble(),
                 top: item.y.toDouble(),
                 child: pw.Container(
                   width: item.width.toDouble(),
                   height: item.height.toDouble(),
-                  child: pw.Text(
-                    item.text,
-                    style: pw.TextStyle(
-                      font: ttf,
-                      renderingMode: showTextOnScan ? null : PdfTextRenderingMode.invisible,
-                      fontSize: item.height > 0 ? item.height.toDouble() : 1.0,
-                      color: PdfColors.red
+                  child: pw.FittedBox(
+                    fit: pw.BoxFit.fill, 
+                    child: pw.Text(
+                      item.text,
+                      softWrap: false,
+                      style: pw.TextStyle(
+                        font: ttf,
+                        renderingMode: showTextOnScan ? null : PdfTextRenderingMode.invisible,
+                        fontSize: item.height > 0 ? item.height.toDouble() : 1.0,
+                        color: PdfColors.red
+                      ),
                     ),
                   ),
                 ),
@@ -70,7 +100,6 @@ Future<bool> createSearchablePdf(
       },
     ),
   );
-
   return writeFile(pdf);
 }
 
