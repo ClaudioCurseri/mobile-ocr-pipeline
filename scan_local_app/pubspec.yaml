@@ -1,7 +1,7 @@
 name: scan_local
 description: "An On-Device OCR Document Scanner App."
 publish_to: 'none'
-version: 0.1.0
+version: 1.0.0
 
 platforms:
   android:
