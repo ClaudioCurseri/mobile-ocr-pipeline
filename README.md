@@ -1,5 +1,7 @@
 # On-Device OCR In Mobile Applications
 
+[![DOI](https://zenodo.org/badge/1136776098.svg)](https://doi.org/10.5281/zenodo.18924079)
+
 > Bachelor's Thesis: Development and Evaluation of an On-Device OCR-Pipeline for Text Recognition and Digital Processing of Documents in Mobile Applications
 
 ## Project Structure
